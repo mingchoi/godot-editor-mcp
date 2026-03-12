@@ -256,7 +256,7 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 			break
 
 	if expected_type == TYPE_NIL:
-		_logger.warn("Property type not found in list", {"property": property})
+		_logger.warning("Property type not found in list", {"property": property})
 
 	var value: Variant = _json_to_variant(raw_value, expected_type)
 	_logger.info("Value conversion", {"raw_type": type_string(typeof(raw_value)), "converted_type": type_string(typeof(value))})
@@ -490,6 +490,26 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 		elif expected_type == TYPE_QUATERNION:
 			if d.has("x") and d.has("y") and d.has("z") and d.has("w"):
 				return Quaternion(float(d["x"]), float(d["y"]), float(d["z"]), float(d["w"]))
+		elif expected_type == TYPE_OBJECT:
+			# Handle resource creation (shapes, meshes, etc.)
+			if d.has("type"):
+				var resource_type: String = d["type"]
+				if ClassDB.class_exists(resource_type):
+					var resource: Resource = ClassDB.instantiate(resource_type)
+					if resource != null:
+						# Set any additional properties on the resource with type conversion
+						for key: String in d:
+							if key != "type":
+								# Get property info to find expected type
+								var prop_list: Array[Dictionary] = resource.get_property_list()
+								var prop_type: int = TYPE_NIL
+								for prop_info: Dictionary in prop_list:
+									if prop_info["name"] == key:
+										prop_type = prop_info["type"]
+										break
+								var converted_value: Variant = _json_to_variant(d[key], prop_type)
+								resource.set(key, converted_value)
+						return resource
 
 	# Convert array elements
 	if typeof(value) == TYPE_ARRAY:

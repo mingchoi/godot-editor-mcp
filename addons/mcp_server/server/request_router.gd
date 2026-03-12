@@ -132,6 +132,14 @@ func _handle_tools_call(request: MCPRequest) -> String:
 	# Execute the tool
 	var result: MCPToolResult = handler.execute(arguments)
 
+	# Handle null result (execution failed)
+	if result == null:
+		return MCPJSONRPC.create_error(
+			request.id,
+			MCPError.Code.TOOL_EXECUTION_ERROR,
+			"Tool execution failed"
+		)
+
 	# Build and return response
 	return ResponseBuilder.jsonrpc_success(request.id, result.to_response_dict())
 
