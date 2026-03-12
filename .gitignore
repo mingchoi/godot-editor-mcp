@@ -2,8 +2,82 @@
 .godot/
 /android/
 
+# Imported textures (automatically generated from source)
+*.converted.*.normal
+*.ctex
+
+# Imported scenes, resources and scripts
+*.escn
+*.res
+*.tres
+*.gdshader
+
+# Godot-specific binary files
+*.scn
+*.ttf
+*.otf
+*.woff
+*.woff2
+*.mp3
+*.wav
+*.ogg
+*.webm
+*.mp4
+*.ogv
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# Build outputs
+build/
+dist/
+exports/
+
+# OS/Editor specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
 # Godot project files
 .editorconfig
 icon.svg
 icon.svg.import
 project.godot
+
+# Claude
+.claude/
+CLAUDE.md
+.specify/
+specs/
+prompts/
