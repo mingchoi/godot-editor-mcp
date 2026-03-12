@@ -234,12 +234,32 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 
 	var path: String = params.get("path", "")
 	var property: String = params.get("property", "")
-	var value: Variant = params.get("value")
+	var raw_value: Variant = params.get("value")
+
+	# Parse JSON string if necessary (MCP may send objects as JSON strings)
+	if typeof(raw_value) == TYPE_STRING:
+		var parsed = JSON.parse_string(raw_value)
+		if parsed != null:
+			raw_value = parsed
 
 	var node: Node = _resolve_node(path)
 	if node == null:
 		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
 
+	# Get the expected type and convert the value
+	var property_list: Array = node.get_property_list()
+	var expected_type: int = TYPE_NIL
+	for prop: Dictionary in property_list:
+		if prop["name"] == property:
+			expected_type = prop["type"]
+			_logger.info("Found property type", {"property": property, "type": expected_type, "type_name": type_string(expected_type)})
+			break
+
+	if expected_type == TYPE_NIL:
+		_logger.warn("Property type not found in list", {"property": property})
+
+	var value: Variant = _json_to_variant(raw_value, expected_type)
+	_logger.info("Value conversion", {"raw_type": type_string(typeof(raw_value)), "converted_type": type_string(typeof(value))})
 	var old_value: Variant = node.get(property)
 	node.set(property, value)
 
@@ -434,3 +454,59 @@ func _variant_to_json(value: Variant) -> Variant:
 			return str(value)
 		_:
 			return value
+
+
+## Converts JSON-compatible value back to Godot Variant based on expected type
+func _json_to_variant(value: Variant, expected_type: int) -> Variant:
+	if value == null:
+		return null
+
+	# If already the right type, return as-is
+	if typeof(value) == expected_type:
+		return value
+
+	# Convert dictionary to Godot types
+	if typeof(value) == TYPE_DICTIONARY:
+		var d: Dictionary = value
+		# Use explicit integer comparisons for match
+		if expected_type == TYPE_VECTOR3:
+			if d.has("x") and d.has("y") and d.has("z"):
+				return Vector3(float(d["x"]), float(d["y"]), float(d["z"]))
+		elif expected_type == TYPE_VECTOR3I:
+			if d.has("x") and d.has("y") and d.has("z"):
+				return Vector3i(int(d["x"]), int(d["y"]), int(d["z"]))
+		elif expected_type == TYPE_VECTOR2:
+			if d.has("x") and d.has("y"):
+				return Vector2(float(d["x"]), float(d["y"]))
+		elif expected_type == TYPE_VECTOR2I:
+			if d.has("x") and d.has("y"):
+				return Vector2i(int(d["x"]), int(d["y"]))
+		elif expected_type == TYPE_RECT2:
+			if d.has("x") and d.has("y") and d.has("w") and d.has("h"):
+				return Rect2(float(d["x"]), float(d["y"]), float(d["w"]), float(d["h"]))
+		elif expected_type == TYPE_COLOR:
+			if d.has("r") and d.has("g") and d.has("b"):
+				return Color(float(d["r"]), float(d["g"]), float(d["b"]), float(d.get("a", 1.0)))
+		elif expected_type == TYPE_QUATERNION:
+			if d.has("x") and d.has("y") and d.has("z") and d.has("w"):
+				return Quaternion(float(d["x"]), float(d["y"]), float(d["z"]), float(d["w"]))
+
+	# Convert array elements
+	if typeof(value) == TYPE_ARRAY:
+		if expected_type == TYPE_PACKED_INT32_ARRAY:
+			var arr: PackedInt32Array = []
+			for item: Variant in value:
+				arr.append(int(item))
+			return arr
+		elif expected_type == TYPE_PACKED_FLOAT32_ARRAY:
+			var arr: PackedFloat32Array = []
+			for item: Variant in value:
+				arr.append(float(item))
+			return arr
+		elif expected_type == TYPE_PACKED_STRING_ARRAY:
+			var arr: PackedStringArray = []
+			for item: Variant in value:
+				arr.append(str(item))
+			return arr
+
+	return value
