@@ -11,6 +11,10 @@ var _tool_registry: ToolRegistry
 var _request_router: RequestRouter
 var _logger: MCPLogger
 
+# Keep references to tool objects to prevent garbage collection
+# (MCPToolHandler Callables reference methods on these objects)
+var _tool_objects: Array[RefCounted] = []
+
 
 func _init(config: MCPServerConfig, logger: MCPLogger = null) -> void:
 	_config = config
@@ -73,18 +77,22 @@ func _register_tools() -> void:
 	# Input tools
 	var input_tools := InputTools.new(_logger)
 	input_tools.register_all(_tool_registry)
+	_tool_objects.append(input_tools)
 
 	# Capture tools
 	var capture_tools := CaptureTools.new(_logger)
 	capture_tools.register_all(_tool_registry)
+	_tool_objects.append(capture_tools)
 
 	# Game control tools
 	var game_control_tools := GameControlTools.new(_logger)
 	game_control_tools.register_all(_tool_registry)
+	_tool_objects.append(game_control_tools)
 
 	# Runtime query tools
 	var runtime_query_tools := RuntimeQueryTools.new(_logger)
 	runtime_query_tools.register_all(_tool_registry)
+	_tool_objects.append(runtime_query_tools)
 
 	_logger.info("Tools registered", {"count": _tool_registry.size()})
 

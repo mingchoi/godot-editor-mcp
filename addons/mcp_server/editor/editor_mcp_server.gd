@@ -10,9 +10,11 @@ var _ws_server: MCPWebSocketServer
 var _tool_registry: ToolRegistry
 var _request_router: RequestRouter
 var _logger: MCPLogger
-
-
 var _editor_interface: EditorInterface
+
+# Keep references to tool objects to prevent garbage collection
+# (MCPToolHandler Callables reference methods on these objects)
+var _tool_objects: Array[RefCounted] = []
 
 
 func _init(config: MCPServerConfig, logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
@@ -77,26 +79,37 @@ func _register_tools() -> void:
 	# Scene tools - pass EditorInterface
 	var scene_tools := SceneTools.new(_logger, _editor_interface)
 	scene_tools.register_all(_tool_registry)
+	_tool_objects.append(scene_tools)
 
 	# Node tools
 	var node_tools := NodeTools.new(_logger, _editor_interface)
 	node_tools.register_all(_tool_registry)
+	_tool_objects.append(node_tools)
 
 	# FileSystem tools
 	var filesystem_tools := FileSystemTools.new(_logger, _editor_interface)
 	filesystem_tools.register_all(_tool_registry)
+	_tool_objects.append(filesystem_tools)
 
 	# Selection tools
 	var selection_tools := SelectionTools.new(_logger, _editor_interface)
 	selection_tools.register_all(_tool_registry)
+	_tool_objects.append(selection_tools)
 
 	# Script tools
 	var script_tools := ScriptTools.new(_logger, _editor_interface)
 	script_tools.register_all(_tool_registry)
+	_tool_objects.append(script_tools)
 
 	# Undo tools
 	var undo_tools := UndoTools.new(_logger, _editor_interface)
 	undo_tools.register_all(_tool_registry)
+	_tool_objects.append(undo_tools)
+
+	# Capture tools (screenshots)
+	var capture_tools := EditorCaptureTools.new(_logger, _editor_interface)
+	capture_tools.register_all(_tool_registry)
+	_tool_objects.append(capture_tools)
 
 	_logger.info("Tools registered", {"count": _tool_registry.size()})
 
