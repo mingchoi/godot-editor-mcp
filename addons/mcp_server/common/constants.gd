@@ -33,8 +33,19 @@ const SCREENSHOT_QUALITY: int = 85
 ## Rate limit: requests per minute per connection
 const RATE_LIMIT_PER_MINUTE: int = 100
 
+## MCP protocol version
+const MCP_VERSION: String = "2024-11-05"
+
 ## MCP method names
+const METHOD_INITIALIZE: String = "initialize"
+const METHOD_INITIALIZED: String = "notifications/initialized"
 const METHOD_TOOLS_LIST: String = "tools/list"
 const METHOD_TOOLS_CALL: String = "tools/call"
+const METHOD_PROMPTS_LIST: String = "prompts/list"
+const METHOD_RESOURCES_LIST: String = "resources/list"
 const METHOD_PING: String = "ping"
+
+## Server info
+const SERVER_NAME: String = "godot-editor-mcp"
+const SERVER_VERSION: String = "1.0.0"
 

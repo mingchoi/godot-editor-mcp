@@ -27,12 +27,20 @@ func route(request: MCPRequest) -> String:
 
 	# Route by method
 	match request.method:
+		MCPConstants.METHOD_INITIALIZE:
+			return _handle_initialize(request)
+		MCPConstants.METHOD_INITIALIZED:
+			return ""  # Notification, no response
 		MCPConstants.METHOD_PING:
 			return _handle_ping(request)
 		MCPConstants.METHOD_TOOLS_LIST:
 			return _handle_tools_list(request)
 		MCPConstants.METHOD_TOOLS_CALL:
 			return _handle_tools_call(request)
+		MCPConstants.METHOD_PROMPTS_LIST:
+			return _handle_prompts_list(request)
+		MCPConstants.METHOD_RESOURCES_LIST:
+			return _handle_resources_list(request)
 		_:
 			if _logger:
 				_logger.warning("Method not found", {"method": request.method})
@@ -46,6 +54,33 @@ func route(request: MCPRequest) -> String:
 ## Handles ping requests
 func _handle_ping(request: MCPRequest) -> String:
 	return ResponseBuilder.jsonrpc_success(request.id, ResponseBuilder.ping_response())
+
+
+## Handles initialize requests (MCP handshake)
+func _handle_initialize(request: MCPRequest) -> String:
+	var result := {
+		"protocolVersion": MCPConstants.MCP_VERSION,
+		"capabilities": {
+			"tools": {
+				"listChanged": false
+			}
+		},
+		"serverInfo": {
+			"name": MCPConstants.SERVER_NAME,
+			"version": MCPConstants.SERVER_VERSION
+		}
+	}
+	return ResponseBuilder.jsonrpc_success(request.id, result)
+
+
+## Handles prompts/list requests (not supported)
+func _handle_prompts_list(request: MCPRequest) -> String:
+	return ResponseBuilder.jsonrpc_success(request.id, {"prompts": []})
+
+
+## Handles resources/list requests (not supported)
+func _handle_resources_list(request: MCPRequest) -> String:
+	return ResponseBuilder.jsonrpc_success(request.id, {"resources": []})
 
 
 ## Handles tools/list requests

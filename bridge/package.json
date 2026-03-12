@@ -1,0 +1,17 @@
+{
+  "name": "godot-mcp-bridge",
+  "version": "1.0.0",
+  "description": "stdio-to-WebSocket bridge for Godot Editor MCP",
+  "type": "module",
+  "main": "index.mjs",
+  "bin": {
+    "godot-mcp-bridge": "./index.mjs"
+  },
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "license": "MIT"
+}

@@ -132,5 +132,6 @@ func _on_message_received(conn_id: int, message: String) -> void:
 	# Route and execute
 	var response: String = _request_router.route(request)
 
-	# Send response
-	_ws_server.send_to(conn_id, response)
+	# Send response (skip if empty - notifications don't need response)
+	if not response.is_empty():
+		_ws_server.send_to(conn_id, response)

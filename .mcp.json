@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "godot-editor": {
+            "command": "node",
+            "args": ["bridge/index.mjs"],
+            "env": {
+                "MCP_WS_PORT": "8765",
+                "MCP_WS_HOST": "localhost"
+            }
+        }
+    }
+}
