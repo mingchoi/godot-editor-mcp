@@ -214,7 +214,7 @@ func _execute_stop() -> MCPToolResult:
 	if not _editor_interface.is_playing_scene():
 		return MCPToolResult.text("No scene is currently running")
 
-	_editor_interface.stop_playing()
+	_editor_interface.stop_playing_scene()
 
 	_logger.info("Scene stopped")
 	return MCPToolResult.text("Scene stopped")
