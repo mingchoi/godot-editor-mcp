@@ -119,6 +119,11 @@ func _register_tools() -> void:
 	capture_tools.register_all(_tool_registry)
 	_tool_objects.append(capture_tools)
 
+	# Viewport navigation tools
+	var viewport_tools := EditorViewportTools.new(_logger, _editor_interface)
+	viewport_tools.register_all(_tool_registry)
+	_tool_objects.append(viewport_tools)
+
 	_logger.info("Tools registered", {"count": _tool_registry.size()})
 
 
