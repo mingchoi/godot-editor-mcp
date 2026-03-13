@@ -81,6 +81,7 @@ static func get_file_info(filepath: String) -> Dictionary:
 	return {
 		"filename": filename,
 		"path": filepath,
+		"absolute_path": ProjectSettings.globalize_path(filepath),
 		"size_bytes": size,
 		"captured_at": timestamp
 	}

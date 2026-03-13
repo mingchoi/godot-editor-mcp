@@ -108,10 +108,11 @@ func _execute_capture_runtime(params: Dictionary) -> MCPToolResult:
 	})
 
 	return MCPToolResult.text(
-		"Screenshot saved: %s" % result.filename,
+		"Screenshot saved: %s" % result.absolute_path,
 		{
 			"path": result.path,
 			"absolute_path": result.absolute_path,
+			"filename": result.filename,
 			"format": result.format,
 			"size_bytes": result.size_bytes,
 			"width": result.width,
@@ -131,8 +132,13 @@ func _execute_list(_params: Dictionary) -> MCPToolResult:
 
 	_logger.info("Listed screenshots", {"count": screenshots.size()})
 
+	# Build text with paths for easy access
+	var lines: Array[String] = ["Found %d screenshot%s:" % [screenshots.size(), "s" if screenshots.size() != 1 else ""]]
+	for info: Dictionary in screenshots:
+		lines.append("  - %s" % info.get("absolute_path", info.get("filename", "unknown")))
+
 	return MCPToolResult.text(
-		"Found %d screenshot%s" % [screenshots.size(), "s" if screenshots.size() != 1 else ""],
+		"\n".join(lines),
 		{
 			"count": screenshots.size(),
 			"total_size_bytes": total_size,
