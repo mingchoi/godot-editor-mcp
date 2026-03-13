@@ -432,83 +432,63 @@ func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
 		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
 
 	var parent: Node = node.get_parent()
-	var node_index: int = -1
+	if parent == null:
+		return MCPToolResult.error("Cannot pack root node (no parent)", MCPError.Code.INVALID_PARAMS)
+
+	var node_index: int = node.get_index()
 	var node_name: String = node.name
+	var scene_root: Node = _editor_interface.get_edited_scene_root()
+
+	# Store transform
 	var original_transform_3d: Transform3D
 	var original_transform_2d: Transform2D
 	var is_node3d: bool = node is Node3D
 	var is_node2d: bool = node is Node2D
 
-	# Store transform before any modifications
 	if is_node3d:
 		original_transform_3d = node.transform
 	elif is_node2d:
 		original_transform_2d = node.transform
 
-	# Remove from parent if it has one
-	if parent != null:
-		node_index = node.get_index()
-		parent.remove_child(node)
+	# Duplicate the node for packing (keep original in scene tree)
+	var duplicate: Node = node.duplicate(Node.DUPLICATE_SIGNALS | Node.DUPLICATE_GROUPS | Node.DUPLICATE_SCRIPTS)
+	if duplicate == null:
+		return MCPToolResult.error("Failed to duplicate node", MCPError.Code.TOOL_EXECUTION_ERROR)
 
-	# Reset transform to avoid "root node transform" warning
+	# Reset transform on duplicate to avoid "root node transform" warning
 	if is_node3d:
-		node.transform = Transform3D()
+		duplicate.transform = Transform3D()
 	elif is_node2d:
-		node.transform = Transform2D()
+		duplicate.transform = Transform2D()
 
-	# Set children's owner to the node being packed
-	# This allows pack() to include them (pack only includes nodes owned by the root)
-	_set_owner_recursive(node, node)
+	# Set children's owner to the duplicate root so they get packed
+	_set_owner_recursive(duplicate, duplicate)
 
-	# Pack the node
+	# Pack the duplicate
 	var packed := PackedScene.new()
-	var pack_result: int = packed.pack(node)
+	var pack_result: int = packed.pack(duplicate)
+
+	# Free the duplicate (we don't need it anymore)
+	duplicate.queue_free()
 
 	if pack_result != OK:
-		# Restore node on failure
-		if is_node3d:
-			node.transform = original_transform_3d
-		elif is_node2d:
-			node.transform = original_transform_2d
-		if parent != null:
-			parent.add_child(node)
-			parent.move_child(node, node_index)
-			node.owner = _editor_interface.get_edited_scene_root()
 		return MCPToolResult.error("Failed to pack node: %s" % path, MCPError.Code.TOOL_EXECUTION_ERROR)
 
 	# Save the packed scene
 	var save_result: int = ResourceSaver.save(packed, destination)
 	if save_result != OK:
-		# Restore node on failure
-		if is_node3d:
-			node.transform = original_transform_3d
-		elif is_node2d:
-			node.transform = original_transform_2d
-		if parent != null:
-			parent.add_child(node)
-			parent.move_child(node, node_index)
-			node.owner = _editor_interface.get_edited_scene_root()
 		return MCPToolResult.error("Failed to save scene to: %s" % destination, MCPError.Code.TOOL_EXECUTION_ERROR)
 
 	# Update the filesystem so the new scene is recognized
 	var fs: EditorFileSystem = _editor_interface.get_resource_filesystem()
 	fs.update_file(destination)
 
-	# Load the saved scene from disk (not from memory) so the instance gets scene_file_path set
+	# Load the saved scene from disk so the instance gets scene_file_path set
 	var loaded_scene: PackedScene = ResourceLoader.load(destination)
 	if loaded_scene == null:
-		# Restore node on failure
-		if is_node3d:
-			node.transform = original_transform_3d
-		elif is_node2d:
-			node.transform = original_transform_2d
-		if parent != null:
-			parent.add_child(node)
-			parent.move_child(node, node_index)
-			node.owner = _editor_interface.get_edited_scene_root()
 		return MCPToolResult.error("Failed to load saved scene: %s" % destination, MCPError.Code.TOOL_EXECUTION_ERROR)
 
-	# Create an instance from the loaded scene (this sets scene_file_path properly)
+	# Create an instance from the loaded scene
 	var instance: Node = loaded_scene.instantiate()
 	instance.name = node_name
 
@@ -518,11 +498,11 @@ func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
 	elif is_node2d:
 		instance.transform = original_transform_2d
 
-	# Add instance to parent (replacing original)
-	if parent != null:
-		parent.add_child(instance)
-		parent.move_child(instance, node_index)
-		instance.owner = _editor_interface.get_edited_scene_root()
+	# Remove original node and add instance
+	parent.remove_child(node)
+	parent.add_child(instance)
+	parent.move_child(instance, node_index)
+	instance.owner = scene_root
 
 	# Free the original node
 	node.queue_free()
@@ -533,7 +513,7 @@ func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
 		"source_path": path,
 		"destination": destination,
 		"saved": true,
-		"instance_path": str(instance.get_path()) if instance.get_parent() != null else ""
+		"instance_path": str(instance.get_path())
 	})
 
 
