@@ -32,6 +32,7 @@ var _runtime_tool_names: Array[String] = [
 	"runtime_get_node",
 	"runtime_call_method",
 	"runtime_get_property",
+	"runtime_set_property",
 	"runtime_get_performance",
 	# Capture tools
 	"screenshot_capture_runtime",
@@ -295,6 +296,20 @@ func _build_tool_definitions() -> void:
 				"property": {"type": "string", "description": "Property name"}
 			},
 			"required": ["path", "property"]
+		}
+	})
+
+	_tool_definitions.append({
+		"name": "runtime_set_property",
+		"description": "Set a property value on a node in the running game",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path in the running scene"},
+				"property": {"type": "string", "description": "Property name to set"},
+				"value": {"description": "New property value (JSON-compatible types: bool, int, float, string, arrays, objects as {x, y, z, etc.})"}
+			},
+			"required": ["path", "property", "value"]
 		}
 	})
 
