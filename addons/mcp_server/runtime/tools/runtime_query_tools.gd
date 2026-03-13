@@ -9,6 +9,7 @@ const TOOL_SET_PROPERTY := "runtime_set_property"
 const TOOL_CALL_METHOD := "runtime_call_method"
 const TOOL_GET_PERFORMANCE := "runtime_get_performance"
 const TOOL_LIST_CHILDREN := "runtime_list_children"
+const TOOL_GET_NODE_TREE := "runtime_get_node_tree"
 
 var _logger: MCPLogger
 var _editor_interface: EditorInterface
@@ -27,6 +28,7 @@ func register_all(registry: ToolRegistry) -> void:
 	registry.register(_create_call_method_tool())
 	registry.register(_create_get_performance_tool())
 	registry.register(_create_list_children_tool())
+	registry.register(_create_get_node_tree_tool())
 
 
 func _create_get_node_tool() -> MCPToolHandler:
@@ -103,6 +105,22 @@ func _create_list_children_tool() -> MCPToolHandler:
 			["path"]
 		)
 	return MCPToolHandler.new(definition, _execute_list_children)
+
+
+func _create_get_node_tree_tool() -> MCPToolHandler:
+	var definition := MCPToolDefinition.create(
+			TOOL_GET_NODE_TREE,
+			"Returns the complete node hierarchy tree of the running game",
+			{
+				"root_path": {
+					"type": "string",
+					"default": "",
+					"description": "Starting node path (defaults to scene tree root)"
+				}
+			},
+			[]
+		)
+	return MCPToolHandler.new(definition, _execute_get_node_tree)
 
 
 # --- Tool Implementations ---
@@ -316,6 +334,30 @@ func _execute_list_children(params: Dictionary) -> MCPToolResult:
 	})
 
 
+func _execute_get_node_tree(params: Dictionary) -> MCPToolResult:
+	var tree: SceneTree = _get_tree()
+	if tree == null:
+		return MCPToolResult.error("Game not running", MCPError.Code.INTERNAL_ERROR)
+
+	var root_path: String = params.get("root_path", "")
+	var root: Node
+
+	if root_path.is_empty():
+		root = tree.root  # Start from Viewport
+	else:
+		root = _resolve_node(root_path)
+		if root == null:
+			return MCPToolResult.error("Node not found: %s" % root_path, MCPError.Code.NOT_FOUND)
+
+	var tree_data: Dictionary = _build_runtime_tree(root)
+	var tree_text: String = _format_tree_text(tree_data, "")
+
+	_logger.info("Runtime node tree retrieved", {"root_path": root_path})
+	return MCPToolResult.text("Runtime scene tree:\n%s" % tree_text, {
+		"root": tree_data
+	})
+
+
 func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 
@@ -330,6 +372,34 @@ func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
 			result.append_array(_get_children_list(child, true))
 
 	return result
+
+
+func _build_runtime_tree(node: Node) -> Dictionary:
+	var result: Dictionary = {
+		"name": node.name,
+		"type": node.get_class(),
+		"path": str(node.get_path())
+	}
+
+	var children: Array = []
+	for child: Node in node.get_children():
+		children.append(_build_runtime_tree(child))
+
+	if not children.is_empty():
+		result["children"] = children
+
+	return result
+
+
+func _format_tree_text(node: Dictionary, indent: String) -> String:
+	var line: String = "%s|-- %s (%s)\n" % [indent, node.name, node.type]
+	var child_indent: String = indent + "|   "
+
+	if node.has("children"):
+		for child: Dictionary in node.children:
+			line += _format_tree_text(child, child_indent)
+
+	return line
 
 
 func _variant_to_json(value: Variant) -> Variant:

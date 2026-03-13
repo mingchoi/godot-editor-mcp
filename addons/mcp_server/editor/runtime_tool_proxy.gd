@@ -35,6 +35,7 @@ var _runtime_tool_names: Array[String] = [
 	"runtime_set_property",
 	"runtime_get_performance",
 	"runtime_list_children",
+	"runtime_get_node_tree",
 	# Runtime node tools
 	"runtime_node_create",
 	"runtime_node_delete",
@@ -339,6 +340,23 @@ func _build_tool_definitions() -> void:
 				"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
 			},
 			"required": ["path"]
+		}
+	})
+
+	# Runtime get node tree tool
+	_tool_definitions.append({
+		"name": "runtime_get_node_tree",
+		"description": "Returns the complete node hierarchy tree of the running game",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"root_path": {
+					"type": "string",
+					"default": "",
+					"description": "Starting node path (defaults to scene tree root)"
+				}
+			},
+			"required": []
 		}
 	})
 
