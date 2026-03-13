@@ -10,6 +10,7 @@ const TOOL_CREATE := "node_create"
 const TOOL_DELETE := "node_delete"
 const TOOL_LIST_CHILDREN := "node_list_children"
 const TOOL_DUPLICATE := "node_duplicate"
+const TOOL_PACK_AS_SCENE := "node_pack_as_scene"
 
 var _editor_interface: EditorInterface
 var _logger: MCPLogger
@@ -29,6 +30,7 @@ func register_all(registry: ToolRegistry) -> void:
 	registry.register(_create_delete_tool())
 	registry.register(_create_list_children_tool())
 	registry.register(_create_duplicate_tool())
+	registry.register(_create_pack_as_scene_tool())
 
 
 func _create_get_tool() -> MCPToolHandler:
@@ -147,6 +149,21 @@ func _create_duplicate_tool() -> MCPToolHandler:
 			["path"]
 		),
 		func(params: Dictionary) -> MCPToolResult: return _execute_duplicate(params)
+	)
+
+
+func _create_pack_as_scene_tool() -> MCPToolHandler:
+	return MCPToolHandler.new(
+		MCPToolDefinition.create(
+			TOOL_PACK_AS_SCENE,
+			"Saves a node branch as a new scene file and converts the node to an instance",
+			{
+				"path": {"type": "string", "description": "Source node path to pack"},
+				"destination": {"type": "string", "description": "Destination file path (e.g., 'res://scenes/new.tscn')"}
+			},
+			["path", "destination"]
+		),
+		func(params: Dictionary) -> MCPToolResult: return _execute_pack_as_scene(params)
 	)
 
 
@@ -395,6 +412,131 @@ func _execute_duplicate(params: Dictionary) -> MCPToolResult:
 	})
 
 
+func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
+	if _editor_interface == null:
+		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+
+	var path: String = params.get("path", "")
+	var destination: String = params.get("destination", "")
+
+	# Validate destination path
+	if not destination.begins_with("res://"):
+		return MCPToolResult.error("Destination must be a res:// path", MCPError.Code.INVALID_PARAMS)
+
+	if not destination.ends_with(".tscn") and not destination.ends_with(".scn"):
+		return MCPToolResult.error("Destination must have .tscn or .scn extension", MCPError.Code.INVALID_PARAMS)
+
+	# Get the node to pack
+	var node: Node = _resolve_node(path)
+	if node == null:
+		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+
+	var parent: Node = node.get_parent()
+	var node_index: int = -1
+	var node_name: String = node.name
+	var original_transform_3d: Transform3D
+	var original_transform_2d: Transform2D
+	var is_node3d: bool = node is Node3D
+	var is_node2d: bool = node is Node2D
+
+	# Store transform before any modifications
+	if is_node3d:
+		original_transform_3d = node.transform
+	elif is_node2d:
+		original_transform_2d = node.transform
+
+	# Remove from parent if it has one
+	if parent != null:
+		node_index = node.get_index()
+		parent.remove_child(node)
+
+	# Reset transform to avoid "root node transform" warning
+	if is_node3d:
+		node.transform = Transform3D()
+	elif is_node2d:
+		node.transform = Transform2D()
+
+	# Set children's owner to the node being packed
+	# This allows pack() to include them (pack only includes nodes owned by the root)
+	_set_owner_recursive(node, node)
+
+	# Pack the node
+	var packed := PackedScene.new()
+	var pack_result: int = packed.pack(node)
+
+	if pack_result != OK:
+		# Restore node on failure
+		if is_node3d:
+			node.transform = original_transform_3d
+		elif is_node2d:
+			node.transform = original_transform_2d
+		if parent != null:
+			parent.add_child(node)
+			parent.move_child(node, node_index)
+			node.owner = _editor_interface.get_edited_scene_root()
+		return MCPToolResult.error("Failed to pack node: %s" % path, MCPError.Code.TOOL_EXECUTION_ERROR)
+
+	# Save the packed scene
+	var save_result: int = ResourceSaver.save(packed, destination)
+	if save_result != OK:
+		# Restore node on failure
+		if is_node3d:
+			node.transform = original_transform_3d
+		elif is_node2d:
+			node.transform = original_transform_2d
+		if parent != null:
+			parent.add_child(node)
+			parent.move_child(node, node_index)
+			node.owner = _editor_interface.get_edited_scene_root()
+		return MCPToolResult.error("Failed to save scene to: %s" % destination, MCPError.Code.TOOL_EXECUTION_ERROR)
+
+	# Update the filesystem so the new scene is recognized
+	var fs: EditorFileSystem = _editor_interface.get_resource_filesystem()
+	fs.update_file(destination)
+
+	# Load the saved scene from disk (not from memory) so the instance gets scene_file_path set
+	var loaded_scene: PackedScene = ResourceLoader.load(destination)
+	if loaded_scene == null:
+		# Restore node on failure
+		if is_node3d:
+			node.transform = original_transform_3d
+		elif is_node2d:
+			node.transform = original_transform_2d
+		if parent != null:
+			parent.add_child(node)
+			parent.move_child(node, node_index)
+			node.owner = _editor_interface.get_edited_scene_root()
+		return MCPToolResult.error("Failed to load saved scene: %s" % destination, MCPError.Code.TOOL_EXECUTION_ERROR)
+
+	# Create an instance from the loaded scene (this sets scene_file_path properly)
+	var instance: Node = loaded_scene.instantiate()
+	instance.name = node_name
+
+	# Restore the original transform on the instance
+	if is_node3d:
+		instance.transform = original_transform_3d
+	elif is_node2d:
+		instance.transform = original_transform_2d
+
+	# Add instance to parent (replacing original)
+	if parent != null:
+		parent.add_child(instance)
+		parent.move_child(instance, node_index)
+		instance.owner = _editor_interface.get_edited_scene_root()
+
+	# Free the original node
+	node.queue_free()
+
+	_logger.info("Node packed as scene and replaced with instance", {"source": path, "destination": destination})
+
+	return MCPToolResult.text("Packed node as scene: %s" % destination, {
+		"source_path": path,
+		"destination": destination,
+		"saved": true,
+		"instance_path": str(instance.get_path()) if instance.get_parent() != null else ""
+	})
+
+
 func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 
@@ -409,6 +551,20 @@ func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
 			result.append_array(_get_children_list(child, true))
 
 	return result
+
+
+## Recursively clears owner on node and all descendants
+func _clear_ownership(node: Node) -> void:
+	node.owner = null
+	for child: Node in node.get_children():
+		_clear_ownership(child)
+
+
+## Recursively sets owner on all descendants (not the node itself)
+func _set_owner_recursive(node: Node, owner: Node) -> void:
+	for child: Node in node.get_children():
+		child.owner = owner
+		_set_owner_recursive(child, owner)
 
 
 func _get_node_properties(node: Node) -> Dictionary:

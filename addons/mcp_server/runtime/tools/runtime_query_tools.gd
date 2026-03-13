@@ -8,6 +8,7 @@ const TOOL_GET_PROPERTY := "runtime_get_property"
 const TOOL_SET_PROPERTY := "runtime_set_property"
 const TOOL_CALL_METHOD := "runtime_call_method"
 const TOOL_GET_PERFORMANCE := "runtime_get_performance"
+const TOOL_LIST_CHILDREN := "runtime_list_children"
 
 var _logger: MCPLogger
 var _editor_interface: EditorInterface
@@ -25,6 +26,7 @@ func register_all(registry: ToolRegistry) -> void:
 	registry.register(_create_set_property_tool())
 	registry.register(_create_call_method_tool())
 	registry.register(_create_get_performance_tool())
+	registry.register(_create_list_children_tool())
 
 
 func _create_get_node_tool() -> MCPToolHandler:
@@ -88,6 +90,19 @@ func _create_get_performance_tool() -> MCPToolHandler:
 			[]
 		)
 	return MCPToolHandler.new(definition, _execute_get_performance)
+
+
+func _create_list_children_tool() -> MCPToolHandler:
+	var definition := MCPToolDefinition.create(
+			TOOL_LIST_CHILDREN,
+			"Lists children of a node in the running game",
+			{
+				"path": {"type": "string", "description": "Node path in the running scene"},
+				"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
+			},
+			["path"]
+		)
+	return MCPToolHandler.new(definition, _execute_list_children)
 
 
 # --- Tool Implementations ---
@@ -282,6 +297,39 @@ func _execute_get_performance(_params: Dictionary = {}) -> MCPToolResult:
 	]
 
 	return MCPToolResult.text(text, data)
+
+
+func _execute_list_children(params: Dictionary) -> MCPToolResult:
+	var path: String = params.get("path", "")
+	var recursive: bool = params.get("recursive", false)
+
+	var node: Node = _resolve_node(path)
+	if node == null:
+		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+
+	var children: Array[Dictionary] = _get_children_list(node, recursive)
+
+	return MCPToolResult.text("Found %d children" % children.size(), {
+		"path": str(node.get_path()),
+		"children": children,
+		"count": children.size()
+	})
+
+
+func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+
+	for child: Node in node.get_children():
+		result.append({
+			"path": str(child.get_path()),
+			"name": child.name,
+			"type": child.get_class()
+		})
+
+		if recursive:
+			result.append_array(_get_children_list(child, true))
+
+	return result
 
 
 func _variant_to_json(value: Variant) -> Variant:

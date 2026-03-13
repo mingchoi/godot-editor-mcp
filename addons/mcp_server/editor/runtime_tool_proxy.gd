@@ -34,6 +34,11 @@ var _runtime_tool_names: Array[String] = [
 	"runtime_get_property",
 	"runtime_set_property",
 	"runtime_get_performance",
+	"runtime_list_children",
+	# Runtime node tools
+	"runtime_node_create",
+	"runtime_node_delete",
+	"runtime_instantiate_scene",
 	# Capture tools
 	"screenshot_capture_runtime",
 	"screenshot_list",
@@ -320,6 +325,64 @@ func _build_tool_definitions() -> void:
 			"type": "object",
 			"properties": {},
 			"required": []
+		}
+	})
+
+	# Runtime list children tool
+	_tool_definitions.append({
+		"name": "runtime_list_children",
+		"description": "Lists children of a node in the running game",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path in the running scene"},
+				"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
+			},
+			"required": ["path"]
+		}
+	})
+
+	# Runtime node create tool
+	_tool_definitions.append({
+		"name": "runtime_node_create",
+		"description": "Creates a new node in the running game",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"type": {"type": "string", "description": "Node type (e.g., 'Sprite2D', 'Node3D')"},
+				"parent": {"type": "string", "description": "Parent node path"},
+				"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
+				"properties": {"type": "object", "default": {}, "description": "Initial property values"}
+			},
+			"required": ["type", "parent"]
+		}
+	})
+
+	# Runtime node delete tool
+	_tool_definitions.append({
+		"name": "runtime_node_delete",
+		"description": "Deletes a node from the running game",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path to delete"}
+			},
+			"required": ["path"]
+		}
+	})
+
+	# Runtime instantiate scene tool
+	_tool_definitions.append({
+		"name": "runtime_instantiate_scene",
+		"description": "Instantiates a scene file into the running game",
+		"inputSchema": {
+			"type": "object",
+			"properties": {
+				"scene_path": {"type": "string", "description": "Scene resource path (e.g., 'res://scenes/enemy.tscn')"},
+				"parent": {"type": "string", "description": "Parent node path"},
+				"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"}
+			},
+			"required": ["scene_path", "parent"]
 		}
 	})
 

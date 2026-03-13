@@ -352,6 +352,11 @@ func _register_tools() -> void:
 	runtime_query_tools.register_all(_tool_registry)
 	_tool_objects.append(runtime_query_tools)
 
+	# Runtime node tools (create, delete, instantiate)
+	var runtime_node_tools := RuntimeNodeTools.new(_logger)
+	runtime_node_tools.register_all(_tool_registry)
+	_tool_objects.append(runtime_node_tools)
+
 	# Capture tools (screenshots)
 	var capture_tools := CaptureTools.new(_logger)
 	capture_tools.register_all(_tool_registry)
