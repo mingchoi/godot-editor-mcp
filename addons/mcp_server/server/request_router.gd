@@ -16,6 +16,7 @@ func _init(registry: ToolRegistry, logger: MCPLogger = null) -> void:
 
 
 ## Routes a request and returns the response
+## Supports async tool execution via await
 func route(request: MCPRequest) -> String:
 	# Validate request
 	if not request.is_valid():
@@ -36,7 +37,7 @@ func route(request: MCPRequest) -> String:
 		MCPConstants.METHOD_TOOLS_LIST:
 			return _handle_tools_list(request)
 		MCPConstants.METHOD_TOOLS_CALL:
-			return _handle_tools_call(request)
+			return await _handle_tools_call(request)
 		MCPConstants.METHOD_PROMPTS_LIST:
 			return _handle_prompts_list(request)
 		MCPConstants.METHOD_RESOURCES_LIST:
@@ -90,7 +91,7 @@ func _handle_tools_list(request: MCPRequest) -> String:
 	return ResponseBuilder.jsonrpc_success(request.id, result)
 
 
-## Handles tools/call requests
+## Handles tools/call requests (supports async tools)
 func _handle_tools_call(request: MCPRequest) -> String:
 	var params: Dictionary = request.params
 
@@ -129,8 +130,8 @@ func _handle_tools_call(request: MCPRequest) -> String:
 			{"errors": validation_errors}
 		)
 
-	# Execute the tool
-	var result: MCPToolResult = handler.execute(arguments)
+	# Execute the tool (await for async tool support)
+	var result: MCPToolResult = await handler.execute(arguments)
 
 	# Handle null result (execution failed)
 	if result == null:

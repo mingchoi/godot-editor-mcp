@@ -5,6 +5,7 @@ extends Resource
 
 @export var editor_mcp: MCPServerConfig
 @export var runtime_mcp: MCPServerConfig
+@export var runtime_http: RuntimeHTTPConfig
 @export var log_level: String = "info"  # debug, info, warning, error
 @export var allow_delete_operations: bool = true
 @export var confirm_destructive_ops: bool = true
@@ -18,6 +19,8 @@ func _init() -> void:
 		editor_mcp = MCPServerConfig.default_editor_config()
 	if runtime_mcp == null:
 		runtime_mcp = MCPServerConfig.default_runtime_config()
+	if runtime_http == null:
+		runtime_http = RuntimeHTTPConfig.create_default()
 
 
 ## Creates default settings
@@ -25,6 +28,7 @@ static func create_default() -> MCPSettings:
 	var settings := MCPSettings.new()
 	settings.editor_mcp = MCPServerConfig.default_editor_config()
 	settings.runtime_mcp = MCPServerConfig.default_runtime_config()
+	settings.runtime_http = RuntimeHTTPConfig.create_default()
 	return settings
 
 
@@ -69,6 +73,9 @@ func validate() -> Array[String]:
 
 	if runtime_mcp != null:
 		errors.append_array(runtime_mcp.validate())
+
+	if runtime_http != null:
+		errors.append_array(runtime_http.validate())
 
 	if rate_limit_per_minute < 1 or rate_limit_per_minute > 1000:
 		errors.append("Rate limit must be between 1 and 1000")

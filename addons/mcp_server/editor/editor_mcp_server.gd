@@ -11,6 +11,8 @@ var _tool_registry: ToolRegistry
 var _request_router: RequestRouter
 var _logger: MCPLogger
 var _editor_interface: EditorInterface
+var _runtime_tool_proxy: RuntimeToolProxy
+var _settings: MCPSettings
 
 # Keep references to tool objects to prevent garbage collection
 # (MCPToolHandler Callables reference methods on these objects)
@@ -24,10 +26,16 @@ func _init(config: MCPServerConfig, logger: MCPLogger = null, editor_interface: 
 	_tool_registry = ToolRegistry.new()
 	_request_router = RequestRouter.new(_tool_registry, _logger.child("Router"))
 
+	# Load settings for runtime tool proxy
+	_settings = MCPSettings.load_or_create()
+
 
 func _ready() -> void:
 	# Register all editor tools
 	_register_tools()
+
+	# Register runtime tool proxy
+	_register_runtime_tools()
 
 
 ## Starts the WebSocket server
@@ -114,6 +122,17 @@ func _register_tools() -> void:
 	_logger.info("Tools registered", {"count": _tool_registry.size()})
 
 
+## Registers runtime tool proxy (for forwarding to game)
+func _register_runtime_tools() -> void:
+	if _settings == null or _settings.runtime_http == null:
+		_logger.warning("Runtime HTTP config not available, skipping runtime tool proxy")
+		return
+
+	_runtime_tool_proxy = RuntimeToolProxy.new(_settings.runtime_http, _logger)
+	_runtime_tool_proxy.register_all(_tool_registry)
+	_logger.info("Runtime tool proxy registered", {"count": _runtime_tool_proxy._tool_definitions.size() if _runtime_tool_proxy else 0})
+
+
 ## Handles new client connections
 func _on_client_connected(conn_id: int) -> void:
 	_logger.info("Client connected", {"conn_id": conn_id})
@@ -124,7 +143,7 @@ func _on_client_disconnected(conn_id: int) -> void:
 	_logger.info("Client disconnected", {"conn_id": conn_id})
 
 
-## Handles incoming messages
+## Handles incoming messages (supports async tool execution)
 func _on_message_received(conn_id: int, message: String) -> void:
 	_logger.debug("Message received", {"conn_id": conn_id, "length": message.length()})
 
@@ -142,8 +161,8 @@ func _on_message_received(conn_id: int, message: String) -> void:
 
 	var request: MCPRequest = parse_result.request
 
-	# Route and execute
-	var response: String = _request_router.route(request)
+	# Route and execute (await for async tool support)
+	var response: String = await _request_router.route(request)
 
 	# Send response (skip if empty - notifications don't need response)
 	if not response.is_empty():

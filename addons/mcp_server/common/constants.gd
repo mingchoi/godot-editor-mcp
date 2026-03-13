@@ -49,3 +49,27 @@ const METHOD_PING: String = "ping"
 const SERVER_NAME: String = "godot-editor-mcp"
 const SERVER_VERSION: String = "1.0.0"
 
+## HTTP Relay Constants (Feature 005)
+## Default port for Runtime HTTP server (game side)
+const DEFAULT_RUNTIME_HTTP_PORT: int = 8767
+
+## HTTP connection timeout in milliseconds
+const HTTP_CONNECTION_TIMEOUT_MS: int = 500
+
+## HTTP request timeout in milliseconds
+const HTTP_REQUEST_TIMEOUT_MS: int = 5000
+
+## HTTP screenshot timeout in milliseconds (larger payload)
+const HTTP_SCREENSHOT_TIMEOUT_MS: int = 10000
+
+## HTTP error codes
+const HTTP_ERROR_GAME_NOT_RUNNING: String = "GAME_NOT_RUNNING"
+const HTTP_ERROR_TOOL_NOT_FOUND: String = "TOOL_NOT_FOUND"
+const HTTP_ERROR_INVALID_PARAMS: String = "INVALID_PARAMS"
+const HTTP_ERROR_EXECUTION_ERROR: String = "EXECUTION_ERROR"
+const HTTP_ERROR_TIMEOUT: String = "TIMEOUT"
+const HTTP_ERROR_INVALID_REQUEST: String = "INVALID_REQUEST"
+
+## HTTP API version
+const HTTP_API_VERSION: String = "1.0.0"
+

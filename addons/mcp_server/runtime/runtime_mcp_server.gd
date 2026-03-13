@@ -107,7 +107,7 @@ func _on_client_disconnected(conn_id: int) -> void:
 	_logger.info("Client disconnected", {"conn_id": conn_id})
 
 
-## Handles incoming messages
+## Handles incoming messages (supports async tool execution)
 func _on_message_received(conn_id: int, message: String) -> void:
 	_logger.debug("Message received", {"conn_id": conn_id, "length": message.length()})
 
@@ -125,8 +125,8 @@ func _on_message_received(conn_id: int, message: String) -> void:
 
 	var request: MCPRequest = parse_result.request
 
-	# Route and execute
-	var response: String = _request_router.route(request)
+	# Route and execute (await for async tool support)
+	var response: String = await _request_router.route(request)
 
 	# Send response (skip if empty - notifications don't need response)
 	if not response.is_empty():

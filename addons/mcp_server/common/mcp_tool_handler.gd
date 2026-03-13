@@ -14,9 +14,12 @@ func _init(tool_definition: MCPToolDefinition, execute_callback: Callable = Call
 
 ## Executes the tool with given parameters.
 ## Uses the callback if set, otherwise must be overridden in subclass.
+## Always uses await to support both sync and async callbacks.
 func execute(params: Dictionary) -> MCPToolResult:
 	if _execute_callback.is_valid():
-		return _execute_callback.call(params)
+		# Always await - works for both sync and async callbacks
+		var result = await _execute_callback.call(params)
+		return result
 	push_error("execute() must have a valid callback or be overridden in subclass")
 	return MCPToolResult.error("Tool not implemented", MCPError.Code.INTERNAL_ERROR)
 
