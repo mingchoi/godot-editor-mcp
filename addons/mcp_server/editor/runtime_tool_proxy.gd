@@ -398,7 +398,9 @@ func _build_tool_definitions() -> void:
 			"properties": {
 				"scene_path": {"type": "string", "description": "Scene resource path (e.g., 'res://scenes/enemy.tscn')"},
 				"parent": {"type": "string", "description": "Parent node path"},
-				"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"}
+				"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"},
+				"position": {"type": "object", "default": {}, "description": "Initial position as {x, y, z} for 3D or {x, y} for 2D nodes"},
+				"rotation": {"type": "object", "default": {}, "description": "Initial rotation in degrees as {x, y, z} for 3D or {angle} for 2D nodes"}
 			},
 			"required": ["scene_path", "parent"]
 		}

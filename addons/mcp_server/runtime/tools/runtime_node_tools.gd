@@ -57,7 +57,9 @@ func _create_instantiate_scene_tool() -> MCPToolHandler:
 			{
 				"scene_path": {"type": "string", "description": "Scene resource path (e.g., 'res://scenes/enemy.tscn')"},
 				"parent": {"type": "string", "description": "Parent node path"},
-				"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"}
+				"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"},
+				"position": {"type": "object", "default": {}, "description": "Initial position as {x, y, z} for 3D or {x, y} for 2D nodes"},
+				"rotation": {"type": "object", "default": {}, "description": "Initial rotation in degrees as {x, y, z} for 3D or {x, y, angle} for 2D nodes"}
 			},
 			["scene_path", "parent"]
 		)
@@ -167,6 +169,8 @@ func _execute_instantiate_scene(params: Dictionary) -> MCPToolResult:
 	var scene_path: String = params.get("scene_path", "")
 	var parent_path: String = params.get("parent", "")
 	var custom_name: String = params.get("name", "")
+	var position_data: Dictionary = params.get("position", {})
+	var rotation_data: Dictionary = params.get("rotation", {})
 
 	# Load scene
 	if not ResourceLoader.exists(scene_path):
@@ -193,20 +197,62 @@ func _execute_instantiate_scene(params: Dictionary) -> MCPToolResult:
 	# Add to parent
 	parent.add_child(instance)
 
+	# Apply position if provided
+	if not position_data.is_empty():
+		if instance is Node3D:
+			if position_data.has("x") and position_data.has("y") and position_data.has("z"):
+				instance.position = Vector3(
+					float(position_data["x"]),
+					float(position_data["y"]),
+					float(position_data["z"])
+				)
+			elif position_data.has("x") and position_data.has("y"):
+				instance.position = Vector3(
+					float(position_data["x"]),
+					float(position_data["y"]),
+					0.0
+				)
+		elif instance is Node2D:
+			if position_data.has("x") and position_data.has("y"):
+				instance.position = Vector2(
+					float(position_data["x"]),
+					float(position_data["y"])
+				)
+
+	# Apply rotation if provided
+	if not rotation_data.is_empty():
+		if instance is Node3D:
+			if rotation_data.has("x") and rotation_data.has("y") and rotation_data.has("z"):
+				instance.rotation_degrees = Vector3(
+					float(rotation_data["x"]),
+					float(rotation_data["y"]),
+					float(rotation_data["z"])
+				)
+		elif instance is Node2D:
+			if rotation_data.has("angle"):
+				instance.rotation_degrees = float(rotation_data["angle"])
+			elif rotation_data.has("x") and rotation_data.has("y"):
+				# Treat as angle for 2D
+				instance.rotation_degrees = float(rotation_data["x"])
+
 	var instance_path: String = str(instance.get_path())
 	var child_count: int = instance.get_child_count()
 
 	_logger.info("Scene instantiated", {
 		"scene_path": scene_path,
 		"instance_path": instance_path,
-		"child_count": child_count
+		"child_count": child_count,
+		"position": position_data,
+		"rotation": rotation_data
 	})
 
 	return MCPToolResult.text("Instantiated scene: %s" % instance_path, {
 		"path": instance_path,
 		"name": instance.name,
 		"scene_path": scene_path,
-		"child_count": child_count
+		"child_count": child_count,
+		"position": position_data,
+		"rotation": rotation_data
 	})
 
 
