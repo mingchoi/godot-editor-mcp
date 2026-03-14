@@ -27,6 +27,7 @@ func register_all() -> void:
 	_register_selection_tools()
 	_register_script_tools()
 	_register_undo_tools()
+	_register_viewport_tools()
 
 	_logger.info("All editor tools registered", {"count": _registry.size()})
 
@@ -58,4 +59,9 @@ func _register_script_tools() -> void:
 
 func _register_undo_tools() -> void:
 	var tools := UndoTools.new(_logger, _editor_interface)
+	tools.register_all(_registry)
+
+
+func _register_viewport_tools() -> void:
+	var tools := EditorViewportTools.new(_logger, _editor_interface)
 	tools.register_all(_registry)

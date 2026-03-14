@@ -11,6 +11,10 @@ var _tool_registry: ToolRegistry
 var _request_router: RequestRouter
 var _logger: MCPLogger
 
+# Keep references to tool objects to prevent garbage collection
+# (MCPToolHandler Callables reference methods on these objects)
+var _tool_objects: Array[RefCounted] = []
+
 
 func _init(config: MCPServerConfig, logger: MCPLogger = null) -> void:
 	_config = config
@@ -73,18 +77,22 @@ func _register_tools() -> void:
 	# Input tools
 	var input_tools := InputTools.new(_logger)
 	input_tools.register_all(_tool_registry)
+	_tool_objects.append(input_tools)
 
 	# Capture tools
 	var capture_tools := CaptureTools.new(_logger)
 	capture_tools.register_all(_tool_registry)
+	_tool_objects.append(capture_tools)
 
 	# Game control tools
 	var game_control_tools := GameControlTools.new(_logger)
 	game_control_tools.register_all(_tool_registry)
+	_tool_objects.append(game_control_tools)
 
 	# Runtime query tools
 	var runtime_query_tools := RuntimeQueryTools.new(_logger)
 	runtime_query_tools.register_all(_tool_registry)
+	_tool_objects.append(runtime_query_tools)
 
 	_logger.info("Tools registered", {"count": _tool_registry.size()})
 
@@ -99,7 +107,7 @@ func _on_client_disconnected(conn_id: int) -> void:
 	_logger.info("Client disconnected", {"conn_id": conn_id})
 
 
-## Handles incoming messages
+## Handles incoming messages (supports async tool execution)
 func _on_message_received(conn_id: int, message: String) -> void:
 	_logger.debug("Message received", {"conn_id": conn_id, "length": message.length()})
 
@@ -117,8 +125,8 @@ func _on_message_received(conn_id: int, message: String) -> void:
 
 	var request: MCPRequest = parse_result.request
 
-	# Route and execute
-	var response: String = _request_router.route(request)
+	# Route and execute (await for async tool support)
+	var response: String = await _request_router.route(request)
 
 	# Send response (skip if empty - notifications don't need response)
 	if not response.is_empty():

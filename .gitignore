@@ -6,25 +6,6 @@
 *.converted.*.normal
 *.ctex
 
-# Imported scenes, resources and scripts
-*.escn
-*.res
-*.tres
-*.gdshader
-
-# Godot-specific binary files
-*.scn
-*.ttf
-*.otf
-*.woff
-*.woff2
-*.mp3
-*.wav
-*.ogg
-*.webm
-*.mp4
-*.ogv
-
 # Mono-specific ignores
 .mono/
 data_*/
