@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://d2ru5tj3rr5mi"]
+
+[ext_resource type="Material" path="res://scenes/sokoban/materials/box_material.tres" id="1_m5leq"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_wx6sb"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lc7oj"]
+size = Vector3(0.9, 0.9, 0.9)
+
+[node name="Box" type="RigidBody3D" unique_id=1493196523]
+lock_rotation = true
+linear_damp = 15.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=950996700]
+mesh = SubResource("BoxMesh_wx6sb")
+surface_material_override/0 = ExtResource("1_m5leq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1508507985]
+shape = SubResource("BoxShape3D_lc7oj")

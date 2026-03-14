@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://fb3ihv7xa5ku"]
+
+[ext_resource type="Script" path="res://scenes/sokoban/goal.gd" id="1_script"]
+[ext_resource type="Material" uid="uid://mwv780fmfmff" path="res://scenes/sokoban/materials/goal_material.tres" id="1_p3b0d"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_v4ml1"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_v4ml1"]
+size = Vector3(1, 0.19989014, 1)
+
+[node name="Goal" type="Area3D" unique_id=621475349 groups=["goals"]]
+script = ExtResource("1_script")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=323932672]
+transform = Transform3D(1, 0, 0, 0, 0.2, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("BoxMesh_v4ml1")
+surface_material_override/0 = ExtResource("1_p3b0d")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=147365617]
+shape = SubResource("BoxShape3D_v4ml1")
