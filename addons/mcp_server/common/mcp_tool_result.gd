@@ -38,7 +38,10 @@ static func error(message: String, error_code: int = -32000) -> MCPToolResult:
 
 ## Converts to MCP response format
 func to_response_dict() -> Dictionary:
-	return {
+	var response: Dictionary = {
 		"content": content,
 		"isError": is_error
 	}
+	if not data.is_empty():
+		response["data"] = data
+	return response

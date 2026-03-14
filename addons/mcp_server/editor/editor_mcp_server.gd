@@ -124,6 +124,11 @@ func _register_tools() -> void:
 	viewport_tools.register_all(_tool_registry)
 	_tool_objects.append(viewport_tools)
 
+	# Editor log tools
+	var editor_log_tools := EditorLogTools.new(_logger, _editor_interface)
+	editor_log_tools.register_all(_tool_registry)
+	_tool_objects.append(editor_log_tools)
+
 	_logger.info("Tools registered", {"count": _tool_registry.size()})
 
 
