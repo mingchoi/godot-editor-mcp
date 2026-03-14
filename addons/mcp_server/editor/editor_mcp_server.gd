@@ -129,6 +129,11 @@ func _register_tools() -> void:
 	editor_log_tools.register_all(_tool_registry)
 	_tool_objects.append(editor_log_tools)
 
+	# Editor restart tools
+	var editor_restart_tool := EditorRestartTool.new(_logger, _editor_interface)
+	editor_restart_tool.register_all(_tool_registry)
+	_tool_objects.append(editor_restart_tool)
+
 	_logger.info("Tools registered", {"count": _tool_registry.size()})
 
 
