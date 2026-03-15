@@ -10,7 +10,7 @@ var _handlers: Dictionary = {}  # tool_name -> callable
 ## Register a tool with its handler
 func register_tool(tool_def: Dictionary, handler: Callable) -> void:
 	_tools.append(tool_def)
-	_handlers[tool_def.name] = handler
+	_handlers[tool_def["name"]] = handler
 
 
 ## Get all tool definitions for tools/list

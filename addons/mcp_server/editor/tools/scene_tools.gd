@@ -99,7 +99,7 @@ func _create_stop_tool() -> MCPToolHandler:
 			{},
 			[]
 		),
-		func(_params: Dictionary) -> MCPToolResult: return _execute_stop()
+		func(_params: Dictionary) -> MCPToolResult: return _execute_stop(_params)
 	)
 
 
@@ -111,7 +111,7 @@ func _create_get_current_tool() -> MCPToolHandler:
 			{},
 			[]
 		),
-		func(_params: Dictionary) -> MCPToolResult: return _execute_get_current()
+		func(_params: Dictionary) -> MCPToolResult: return _execute_get_current(_params)
 	)
 
 
@@ -123,7 +123,7 @@ func _create_get_node_tree_tool() -> MCPToolHandler:
 			{},
 			[]
 		),
-		func(_params: Dictionary) -> MCPToolResult: return _execute_get_node_tree()
+		func(_params: Dictionary) -> MCPToolResult: return _execute_get_node_tree(_params)
 	)
 
 
@@ -221,7 +221,7 @@ func _execute_run(params: Dictionary) -> MCPToolResult:
 	return MCPToolResult.text("Running scene: %s" % path, {"path": path})
 
 
-func _execute_stop() -> MCPToolResult:
+func _execute_stop(_params: Dictionary = {}) -> MCPToolResult:
 	if _editor_interface == null:
 		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
 
@@ -234,7 +234,7 @@ func _execute_stop() -> MCPToolResult:
 	return MCPToolResult.text("Scene stopped")
 
 
-func _execute_get_current() -> MCPToolResult:
+func _execute_get_current(_params: Dictionary = {}) -> MCPToolResult:
 	if _editor_interface == null:
 		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
 
@@ -281,7 +281,7 @@ func _count_nodes(node: Node) -> int:
 	return count
 
 
-func _execute_get_node_tree() -> MCPToolResult:
+func _execute_get_node_tree(_params: Dictionary = {}) -> MCPToolResult:
 	if _editor_interface == null:
 		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
 

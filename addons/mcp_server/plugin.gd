@@ -20,6 +20,7 @@ const EditorCaptureToolsClass = preload("res://addons/mcp_server/editor/tools/ca
 const EditorViewportToolsClass = preload("res://addons/mcp_server/editor/tools/viewport_tools.gd")
 const EditorLogToolsClass = preload("res://addons/mcp_server/editor/tools/editor_log_tools.gd")
 const EditorRestartToolClass = preload("res://addons/mcp_server/editor/tools/editor_restart_tool.gd")
+const WarningCheckerToolsClass = preload("res://addons/mcp_server/editor/tools/warning_checker_tools.gd")
 
 # Keep references to prevent garbage collection
 var _tool_objects: Array[RefCounted] = []
@@ -107,6 +108,11 @@ func _register_tools() -> void:
 	var editor_restart_tool := EditorRestartToolClass.new(null, _editor_interface)
 	_register_restart_tool(registry, editor_restart_tool)
 	_tool_objects.append(editor_restart_tool)
+
+	# Warning checker tools
+	var warning_checker_tools := WarningCheckerToolsClass.new(null, _editor_interface)
+	_register_warning_checker_tools(registry, warning_checker_tools)
+	_tool_objects.append(warning_checker_tools)
 
 	print("[MCP Server] Registered %d tools" % registry.size())
 
@@ -354,6 +360,33 @@ func _register_restart_tool(registry, tools) -> void:
 	registry.register_tool(
 		_create_tool_def("editor_restart", "Restart the Godot editor", {}, []),
 		func(args): return _run_tool(tools, "_execute_restart", args)
+	)
+
+
+func _register_warning_checker_tools(registry, tools: WarningCheckerTools) -> void:
+	# Get all tool handlers from WarningCheckerTools
+	var get_node_warnings_handler = tools._create_get_node_warnings_tool()
+	var get_scene_warnings_handler = tools._create_get_scene_warnings_tool()
+	var get_warning_types_handler = tools._create_get_warning_types_tool()
+
+	# IMPORTANT: Store handlers in _tool_objects to prevent garbage collection
+	_tool_objects.append(get_node_warnings_handler)
+	_tool_objects.append(get_scene_warnings_handler)
+	_tool_objects.append(get_warning_types_handler)
+
+	# Register each tool with the registry using lambda that captures the handler
+	# This keeps the handler alive and provides proper async execution
+	registry.register_tool(
+		get_node_warnings_handler.definition.to_dict(),
+		func(args): return await get_node_warnings_handler.execute(args)
+	)
+	registry.register_tool(
+		get_scene_warnings_handler.definition.to_dict(),
+		func(args): return await get_scene_warnings_handler.execute(args)
+	)
+	registry.register_tool(
+		get_warning_types_handler.definition.to_dict(),
+		func(args): return await get_warning_types_handler.execute(args)
 	)
 
 

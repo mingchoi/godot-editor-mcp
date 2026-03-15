@@ -3,12 +3,16 @@
         "godot-editor": {
             "command": "node",
             "args": [
-                "bridge/index.mjs"
-            ],
-            "env": {
-                "MCP_WS_PORT": "8765",
-                "MCP_WS_HOST": "localhost"
-            }
+                "bridge/index.js",
+                "8765"
+            ]
+        },
+        "godot-runtime": {
+            "command": "node",
+            "args": [
+                "bridge/index.js",
+                "8766"
+            ]
         }
     }
 }
