@@ -35,11 +35,19 @@ func _enter_tree() -> void:
 	else:
 		push_error("[MCP Server] Failed to start on port %d" % _port)
 
+	# Register RuntimeMCP autoload for game runtime
+	add_autoload_singleton("RuntimeMCP", "res://addons/mcp_server/runtime/runtime_mcp_autoload.gd")
+	print("[MCP Server] Registered RuntimeMCP autoload singleton")
+
 
 func _exit_tree() -> void:
 	if _mcp_server:
 		_mcp_server.stop()
 	print("[MCP Server] Stopped")
+
+	# Remove RuntimeMCP autoload
+	remove_autoload_singleton("RuntimeMCP")
+	print("[MCP Server] Removed RuntimeMCP autoload singleton")
 
 
 func _process(_delta: float) -> void:

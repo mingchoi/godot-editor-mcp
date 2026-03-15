@@ -1,152 +1,272 @@
-## Runtime MCP Autoload
-## Singleton that manages the Runtime MCP Server and HTTP Server.
-## Only active in debug builds.
+## Runtime MCP Server Autoload
+## Runs SimpleMCPServer in the game runtime
 extends Node
 
-const AUTOLOAD_NAME: String = "RuntimeMCP"
+const SimpleMCPServerClass = preload("res://addons/mcp_server/simple_mcp_server.gd")
 
-var _server: RuntimeMCPServer
-var _http_server: RuntimeHTTPServer
-var _settings: MCPSettings
-var _logger: MCPLogger
+var _mcp_server: SimpleMCPServer
+var _port: int = 8766  # Different port from editor (8765) to avoid conflicts
+var _tool_objects: Array[RefCounted] = []
 
 
 func _ready() -> void:
-	# Only run in debug builds (per constitution)
-	if not OS.is_debug_build():
-		push_warning("Runtime MCP: Skipping startup in release build")
-		queue_free()
-		return
+	print("[Runtime MCP Server] Initializing on port %d..." % _port)
+	_mcp_server = SimpleMCPServerClass.new(_port)
 
-	_logger = MCPLogger.new("[RuntimeMCP]")
-	_logger.info("Runtime MCP initializing")
-
-	# Load settings
-	_settings = MCPSettings.load_or_create()
-
-	# Start WebSocket server if enabled (legacy, for backward compatibility)
-	if _settings.runtime_mcp.enabled:
-		_start_server()
+	if _mcp_server.start():
+		print("[Runtime MCP Server] Started on port %d (ws://127.0.0.1:%d)" % [_port, _port])
+		_register_tools()
 	else:
-		_logger.info("Runtime MCP WebSocket server disabled in settings")
-
-	# Start HTTP server if enabled (new HTTP relay architecture)
-	if _settings.runtime_http != null and _settings.runtime_http.enabled:
-		_start_http_server()
-	else:
-		_logger.info("Runtime HTTP server disabled in settings")
+		push_error("[Runtime MCP Server] Failed to start on port %d" % _port)
 
 
-func _exit_tree() -> void:
-	if _server != null:
-		_server.stop()
-		_server.queue_free()
-		_server = null
-
-	if _http_server != null:
-		_http_server.stop()
-		_http_server.queue_free()
-		_http_server = null
+func _process(_delta: float) -> void:
+	if _mcp_server and _mcp_server.is_running():
+		_mcp_server.poll()
 
 
-func _start_server() -> void:
-	if _server != null:
-		_logger.warning("WebSocket server already running")
-		return
-
-	_server = RuntimeMCPServer.new(_settings.runtime_mcp, _logger)
-	add_child(_server)
-
-	var err: Error = _server.start()
-	if err != OK:
-		_logger.error("Failed to start Runtime MCP Server", {"error": err})
-		_server.queue_free()
-		_server = null
-	else:
-		_logger.info("Runtime MCP WebSocket Server started", {
-			"port": _settings.runtime_mcp.port,
-			"host": _settings.runtime_mcp.host
-		})
+## Stop the server (call before game quits)
+func stop_server() -> void:
+	if _mcp_server:
+		_mcp_server.stop()
+		print("[Runtime MCP Server] Stopped")
 
 
-func _start_http_server() -> void:
-	if _http_server != null:
-		_logger.warning("HTTP server already running")
-		return
+func _register_tools() -> void:
+	var registry = _mcp_server.get_tool_registry()
 
-	_http_server = RuntimeHTTPServer.new(_settings.runtime_http, _logger)
-	add_child(_http_server)
+	# Import runtime tool classes
+	const RuntimeQueryToolsClass = preload("res://addons/mcp_server/runtime/tools/runtime_query_tools.gd")
+	const RuntimeNodeToolsClass = preload("res://addons/mcp_server/runtime/tools/runtime_node_tools.gd")
+	const InputToolsClass = preload("res://addons/mcp_server/runtime/tools/input_tools.gd")
+	const CaptureToolsClass = preload("res://addons/mcp_server/runtime/tools/capture_tools.gd")
+	const GameControlToolsClass = preload("res://addons/mcp_server/runtime/tools/game_control_tools.gd")
 
-	var err: Error = _http_server.start()
-	if err != OK:
-		_logger.error("Failed to start Runtime HTTP Server", {"error": err})
-		_http_server.queue_free()
-		_http_server = null
-	else:
-		_logger.info("Runtime HTTP Server started", {
-			"port": _settings.runtime_http.port,
-			"host": _settings.runtime_http.host
-		})
+	# Register Query Tools
+	var query_tools := RuntimeQueryToolsClass.new()
+	_register_runtime_query_tools(registry, query_tools)
+	_tool_objects.append(query_tools)
 
+	# Register Node Tools
+	var node_tools := RuntimeNodeToolsClass.new()
+	_register_runtime_node_tools(registry, node_tools)
+	_tool_objects.append(node_tools)
 
-func _stop_server() -> void:
-	if _server == null:
-		return
+	# Register Input Tools
+	var input_tools := InputToolsClass.new()
+	_register_input_tools(registry, input_tools)
+	_tool_objects.append(input_tools)
 
-	_server.stop()
-	_server.queue_free()
-	_server = null
-	_logger.info("Runtime MCP WebSocket Server stopped")
+	# Register Capture Tools
+	var capture_tools := CaptureToolsClass.new()
+	_register_capture_tools(registry, capture_tools)
+	_tool_objects.append(capture_tools)
 
+	# Register Game Control Tools
+	var game_control_tools := GameControlToolsClass.new()
+	_register_game_control_tools(registry, game_control_tools)
+	_tool_objects.append(game_control_tools)
 
-func _stop_http_server() -> void:
-	if _http_server == null:
-		return
-
-	_http_server.stop()
-	_http_server.queue_free()
-	_http_server = null
-	_logger.info("Runtime HTTP Server stopped")
+	print("[Runtime MCP Server] Registered %d tools" % registry.size())
 
 
-## Checks if the WebSocket server is running
-func is_running() -> bool:
-	return _server != null and _server.is_running()
+# --- Tool Registration Helpers ---
+# Adapt runtime tools to SimpleToolRegistry pattern
+
+func _register_runtime_query_tools(registry: SimpleToolRegistry, tools: RuntimeQueryTools) -> void:
+	registry.register_tool(
+		_create_tool_def("runtime_get_node", "Gets a node from the running scene tree", {
+			"path": {"type": "string", "description": "Node path in the running scene"}
+		}, ["path"]),
+		_make_tool_wrapper(tools, "_execute_get_node")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_get_property", "Gets a property from a runtime node", {
+			"path": {"type": "string", "description": "Node path"},
+			"property": {"type": "string", "description": "Property name"}
+		}, ["path", "property"]),
+		_make_tool_wrapper(tools, "_execute_get_property")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_set_property", "Sets a property value on a node in the running game", {
+			"path": {"type": "string", "description": "Node path in the running scene"},
+			"property": {"type": "string", "description": "Property name to set"},
+			"value": {"description": "New property value (JSON-compatible)"}
+		}, ["path", "property", "value"]),
+		_make_tool_wrapper(tools, "_execute_set_property")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_call_method", "Calls a method on a runtime node", {
+			"path": {"type": "string", "description": "Node path"},
+			"method": {"type": "string", "description": "Method name to call"},
+			"args": {"type": "array", "default": [], "description": "Arguments to pass to the method"}
+		}, ["path", "method"]),
+		_make_tool_wrapper(tools, "_execute_call_method")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_get_performance", "Gets performance statistics", {}, []),
+		_make_tool_wrapper(tools, "_execute_get_performance")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_list_children", "Lists children of a node in the running game", {
+			"path": {"type": "string", "description": "Node path in the running scene"},
+			"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
+		}, ["path"]),
+		_make_tool_wrapper(tools, "_execute_list_children")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_get_node_tree", "Returns the complete node hierarchy tree of the running game", {
+			"root_path": {"type": "string", "default": "", "description": "Starting node path"}
+		}, []),
+		_make_tool_wrapper(tools, "_execute_get_node_tree")
+	)
 
 
-## Checks if the HTTP server is running
-func is_http_running() -> bool:
-	return _http_server != null and _http_server.is_running()
+func _register_runtime_node_tools(registry: SimpleToolRegistry, tools: RuntimeNodeTools) -> void:
+	registry.register_tool(
+		_create_tool_def("runtime_node_create", "Creates a new node in the running game", {
+			"type": {"type": "string", "description": "Node type (e.g., 'Sprite2D', 'Node3D')"},
+			"parent": {"type": "string", "description": "Parent node path"},
+			"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
+			"properties": {"type": "object", "default": {}, "description": "Initial property values"}
+		}, ["type", "parent"]),
+		_make_tool_wrapper(tools, "_execute_node_create")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_node_delete", "Deletes a node from the running game", {
+			"path": {"type": "string", "description": "Node path to delete"}
+		}, ["path"]),
+		_make_tool_wrapper(tools, "_execute_node_delete")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_instantiate_scene", "Instantiates a scene file into the running game", {
+			"scene_path": {"type": "string", "description": "Scene resource path (e.g., 'res://scenes/enemy.tscn')"},
+			"parent": {"type": "string", "description": "Parent node path"},
+			"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"},
+			"position": {"type": "object", "default": {}, "description": "Initial position as {x, y, z} for 3D or {x, y} for 2D nodes"},
+			"rotation": {"type": "object", "default": {}, "description": "Initial rotation in degrees as {x, y, z} for 3D or {x, y, angle} for 2D nodes"}
+		}, ["scene_path", "parent"]),
+		_make_tool_wrapper(tools, "_execute_instantiate_scene")
+	)
 
 
-## Gets the WebSocket server port
-func get_port() -> int:
-	if _settings == null or _settings.runtime_mcp == null:
-		return MCPConstants.DEFAULT_RUNTIME_PORT
-	return _settings.runtime_mcp.port
+func _register_input_tools(registry: SimpleToolRegistry, tools: InputTools) -> void:
+	registry.register_tool(
+		_create_tool_def("runtime_input_key_press", "Simulates a key press and hold", {
+			"key": {"type": "string", "description": "Key name (e.g., 'KEY_A', 'KEY_SPACE', 'KEY_UP')"},
+			"shift": {"type": "boolean", "default": false},
+			"ctrl": {"type": "boolean", "default": false},
+			"alt": {"type": "boolean", "default": false},
+			"duration_ms": {"type": "integer", "default": 100, "description": "Press duration in milliseconds"}
+		}, ["key"]),
+		_make_tool_wrapper(tools, "_execute_key_press")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_input_key_tap", "Simulates a quick key tap (press and release)", {
+			"key": {"type": "string", "description": "Key name"},
+			"shift": {"type": "boolean", "default": false},
+			"ctrl": {"type": "boolean", "default": false},
+			"alt": {"type": "boolean", "default": false}
+		}, ["key"]),
+		_make_tool_wrapper(tools, "_execute_key_tap")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_input_key_release", "Releases a held key", {
+			"key": {"type": "string", "description": "Key name to release"}
+		}, ["key"]),
+		_make_tool_wrapper(tools, "_execute_key_release")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_input_mouse_move", "Moves the mouse to a position", {
+			"position": {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}, "required": ["x", "y"]},
+			"relative": {"type": "boolean", "default": false, "description": "Position is relative"}
+		}, ["position"]),
+		_make_tool_wrapper(tools, "_execute_mouse_move")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_input_mouse_click", "Simulates a mouse button click", {
+			"button": {"type": "string", "enum": ["left", "right", "middle"], "default": "left"},
+			"position": {"type": "object", "description": "Click position"},
+			"double": {"type": "boolean", "default": false, "description": "Double click"},
+			"duration_ms": {"type": "integer", "default": 50}
+		}, []),
+		_make_tool_wrapper(tools, "_execute_mouse_click")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_input_action_press", "Simulates an input action press", {
+			"action": {"type": "string", "description": "Action name from InputMap"},
+			"strength": {"type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0}
+		}, ["action"]),
+		_make_tool_wrapper(tools, "_execute_action_press")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_input_action_release", "Releases an input action", {
+			"action": {"type": "string", "description": "Action name to release"}
+		}, ["action"]),
+		_make_tool_wrapper(tools, "_execute_action_release")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_input_type_text", "Types a string of text character by character", {
+			"text": {"type": "string", "description": "Text to type"},
+			"interval_ms": {"type": "integer", "default": 50, "description": "Delay between keystrokes"}
+		}, ["text"]),
+		_make_tool_wrapper(tools, "_execute_type_text")
+	)
 
 
-## Gets the HTTP server port
-func get_http_port() -> int:
-	if _settings == null or _settings.runtime_http == null:
-		return MCPConstants.DEFAULT_RUNTIME_HTTP_PORT
-	return _settings.runtime_http.port
+func _register_capture_tools(registry: SimpleToolRegistry, tools: CaptureTools) -> void:
+	registry.register_tool(
+		_create_tool_def("runtime_screenshot_capture", "Captures a screenshot of the running game viewport and saves it to disk", {
+			"filename": {"type": "string", "description": "Custom filename (without extension). If not provided, auto-generates timestamp-based name"},
+			"format": {"type": "string", "enum": ["png", "jpg"], "default": "png", "description": "Image format. PNG for lossless, JPG for smaller files"},
+			"quality": {"type": "integer", "minimum": 1, "maximum": 100, "default": 90, "description": "JPG quality (1-100). Only used when format is jpg"}
+		}, []),
+		_make_tool_wrapper(tools, "_execute_capture_runtime")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_screenshot_list", "Lists all captured screenshots in the MCP screenshots directory with metadata", {}, []),
+		_make_tool_wrapper(tools, "_execute_list")
+	)
 
 
-## Restarts the WebSocket server
-func restart() -> void:
-	_stop_server()
-	if _settings != null and _settings.runtime_mcp.enabled:
-		_start_server()
+func _register_game_control_tools(registry: SimpleToolRegistry, tools: GameControlTools) -> void:
+	registry.register_tool(
+		_create_tool_def("runtime_game_pause", "Pauses the game", {}, []),
+		_make_tool_wrapper(tools, "_execute_pause")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_game_resume", "Resumes the game", {}, []),
+		_make_tool_wrapper(tools, "_execute_resume")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_game_set_time_scale", "Sets the game time scale", {
+			"scale": {"type": "number", "minimum": 0.0, "maximum": 10.0, "description": "Time scale (1.0 = normal, 0.5 = half speed, 2.0 = double speed)"}
+		}, ["scale"]),
+		_make_tool_wrapper(tools, "_execute_set_time_scale")
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_game_is_running", "Checks if the game is currently running and returns state", {}, []),
+		_make_tool_wrapper(tools, "_execute_is_running")
+	)
 
 
-## Restarts the HTTP server
-func restart_http() -> void:
-	_stop_http_server()
-	if _settings != null and _settings.runtime_http != null and _settings.runtime_http.enabled:
-		_start_http_server()
+# --- Helper Functions ---
+
+func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	return {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}
 
 
-## Gets the HTTP server instance (for tool access)
-func get_http_server() -> RuntimeHTTPServer:
-	return _http_server
+## Creates a wrapper for tool methods (simple synchronous call)
+func _make_tool_wrapper(tool_obj, method_name: String) -> Callable:
+	return func(args: Dictionary) -> Dictionary:
+		var result = await tool_obj.call(method_name, args)
+		if result is MCPToolResult:
+			return result.to_response_dict()
+		return result

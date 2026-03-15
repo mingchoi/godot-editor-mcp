@@ -174,7 +174,7 @@ func _handle_tools_call(peer_id: int, request_id, params: Dictionary) -> void:
 		_send_error(peer_id, request_id, "Unknown tool: %s" % tool_name, -32601)
 		return
 
-	var result = _tool_registry.call_tool(tool_name, arguments)
+	var result = await _tool_registry.call_tool(tool_name, arguments)
 	_send_message(peer_id, {
 		"jsonrpc": "2.0",
 		"id": request_id,

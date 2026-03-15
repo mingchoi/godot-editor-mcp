@@ -27,7 +27,7 @@ func call_tool(tool_name: String, arguments: Dictionary) -> Dictionary:
 		}
 
 	var handler: Callable = _handlers[tool_name]
-	var result = handler.call(arguments)
+	var result = await handler.call(arguments)
 
 	# Handle both MCPToolResult and plain dict returns
 	if result is MCPToolResult:
