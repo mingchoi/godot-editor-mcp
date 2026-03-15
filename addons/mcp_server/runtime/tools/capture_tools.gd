@@ -3,6 +3,8 @@
 extends RefCounted
 class_name CaptureTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 
 ## Registers all capture tools
 ## Returns the tool instance to prevent garbage collection
@@ -30,12 +32,32 @@ static func register(registry: RefCounted) -> RefCounted:
 			}
 		},
 		[]
-		),
+		, {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Relative path in user:// directory"},
+				"absolute_path": {"type": "string", "description": "Absolute file system path"},
+				"filename": {"type": "string", "description": "Filename with extension"},
+				"format": {"type": "string", "description": "Image format (png or jpg)"},
+				"size_bytes": {"type": "integer", "description": "File size in bytes"},
+				"width": {"type": "integer", "description": "Image width in pixels"},
+				"height": {"type": "integer", "description": "Image height in pixels"},
+				"captured_at": {"type": "string", "description": "ISO 8601 timestamp"},
+				"source": {"type": "string", "description": "Screenshot source (runtime)"}
+			}
+		}),
 		tools._execute_capture_runtime
 	)
 
 	registry.register_tool(
-		_create_tool_def("runtime_screenshot_list", "Lists all captured screenshots in the MCP screenshots directory with metadata", {}, []),
+		_create_tool_def("runtime_screenshot_list", "Lists all captured screenshots in the MCP screenshots directory with metadata", {}, [], {
+			"type": "object",
+			"properties": {
+				"count": {"type": "integer", "description": "Number of screenshots"},
+				"total_size_bytes": {"type": "integer", "description": "Total size in bytes"},
+				"screenshots": {"type": "array", "items": {"type": "object"}, "description": "Array of screenshot info"}
+			}
+		}),
 		tools._execute_list
 	)
 
@@ -72,21 +94,17 @@ func _execute_capture_runtime(args: Dictionary) -> Dictionary:
 	if not result.get("success", false):
 		return {"content": [{"type": "text", "text": "Error: %s" % result.get("error", "Failed to capture screenshot")}], "isError": true}
 
-	return {
-		"content": [{"type": "text", "text": "Screenshot saved: %s" % result.absolute_path}],
-		"isError": false,
-		"data": {
-			"path": result.path,
-			"absolute_path": result.absolute_path,
-			"filename": result.filename,
-			"format": result.format,
-			"size_bytes": result.size_bytes,
-			"width": result.width,
-			"height": result.height,
-			"captured_at": result.captured_at,
-			"source": "runtime"
-		}
-	}
+	return MCPToolRegistry.create_response("Screenshot saved: %s" % result.absolute_path, {
+		"path": result.path,
+		"absolute_path": result.absolute_path,
+		"filename": result.filename,
+		"format": result.format,
+		"size_bytes": result.size_bytes,
+		"width": result.width,
+		"height": result.height,
+		"captured_at": result.captured_at,
+		"source": "runtime"
+	})
 
 
 func _execute_list(_args: Dictionary) -> Dictionary:
@@ -101,15 +119,11 @@ func _execute_list(_args: Dictionary) -> Dictionary:
 	for info: Dictionary in screenshots:
 		lines.append("  - %s" % info.get("absolute_path", info.get("filename", "unknown")))
 
-	return {
-		"content": [{"type": "text", "text": "\n".join(lines)}],
-		"isError": false,
-		"data": {
-			"count": screenshots.size(),
-			"total_size_bytes": total_size,
-			"screenshots": screenshots
-		}
-	}
+	return MCPToolRegistry.create_response("\n".join(lines), {
+		"count": screenshots.size(),
+		"total_size_bytes": total_size,
+		"screenshots": screenshots
+	})
 
 
 # --- Helper Methods ---
@@ -125,12 +139,15 @@ func _get_viewport() -> Viewport:
 	return tree.root
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

@@ -3,6 +3,8 @@
 extends RefCounted
 class_name RuntimeQueryTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 ## Registers all runtime query tools
 ## Returns the tool instance to prevent garbage collection
 static func register(registry: RefCounted) -> RefCounted:
@@ -11,14 +13,33 @@ static func register(registry: RefCounted) -> RefCounted:
 	registry.register_tool(
 		_create_tool_def("runtime_get_node", "Gets a node from the running scene tree", {
 			"path": {"type": "string", "description": "Node path in the running scene"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"name": {"type": "string", "description": "Node name"},
+				"type": {"type": "string", "description": "Godot class name"},
+				"valid": {"type": "boolean", "description": "Whether node is valid"},
+				"child_count": {"type": "integer", "description": "Number of children"},
+				"children": {"type": "array", "items": {"type": "string"}, "description": "Child node names"},
+				"script": {"type": "string", "description": "Script resource path if attached"}
+			}
+		}),
 		tools._execute_get_node
 	)
 	registry.register_tool(
 		_create_tool_def("runtime_get_property", "Gets a property from a runtime node", {
 			"path": {"type": "string", "description": "Node path"},
 			"property": {"type": "string", "description": "Property name"}
-		}, ["path", "property"]),
+		}, ["path", "property"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"property": {"type": "string", "description": "Property name"},
+				"value": {"description": "Property value"},
+				"type": {"type": "integer", "description": "Godot type enum value"}
+			}
+		}),
 		tools._execute_get_property
 	)
 	registry.register_tool(
@@ -26,7 +47,15 @@ static func register(registry: RefCounted) -> RefCounted:
 			"path": {"type": "string", "description": "Node path in the running scene"},
 			"property": {"type": "string", "description": "Property name to set"},
 			"value": {"description": "New property value (JSON-compatible)"}
-		}, ["path", "property", "value"]),
+		}, ["path", "property", "value"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"property": {"type": "string", "description": "Property name"},
+				"old_value": {"description": "Previous value"},
+				"new_value": {"description": "New value"}
+			}
+		}),
 		tools._execute_set_property
 	)
 	registry.register_tool(
@@ -34,18 +63,44 @@ static func register(registry: RefCounted) -> RefCounted:
 			"path": {"type": "string", "description": "Node path"},
 			"method": {"type": "string", "description": "Method name to call"},
 			"args": {"type": "array", "default": [], "description": "Arguments to pass to the method"}
-		}, ["path", "method"]),
+		}, ["path", "method"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"method": {"type": "string", "description": "Method name"},
+				"result": {"description": "Method return value"},
+				"success": {"type": "boolean", "description": "Whether call succeeded"}
+			}
+		}),
 		tools._execute_call_method
 	)
 	registry.register_tool(
-		_create_tool_def("runtime_get_performance", "Gets performance statistics", {}, []),
+		_create_tool_def("runtime_get_performance", "Gets performance statistics", {}, [], {
+			"type": "object",
+			"properties": {
+				"fps": {"type": "number", "description": "Current frames per second"},
+				"fps_min": {"type": "number", "description": "Minimum FPS (not tracked)"},
+				"fps_max": {"type": "number", "description": "Maximum FPS (not tracked)"},
+				"memory_static": {"type": "number", "description": "Static memory usage in bytes"},
+				"draw_calls": {"type": "number", "description": "Total draw calls in frame"},
+				"objects": {"type": "number", "description": "Total object count"},
+				"nodes": {"type": "number", "description": "Node count"}
+			}
+		}),
 		tools._execute_get_performance
 	)
 	registry.register_tool(
 		_create_tool_def("runtime_list_children", "Lists children of a node in the running game", {
 			"path": {"type": "string", "description": "Node path in the running scene"},
 			"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Parent node path"},
+				"children": {"type": "array", "items": {"type": "object"}, "description": "Array of child node info"},
+				"count": {"type": "integer", "description": "Number of children"}
+			}
+		}),
 		tools._execute_list_children
 	)
 	registry.register_tool(
@@ -55,7 +110,12 @@ static func register(registry: RefCounted) -> RefCounted:
 				"default": "",
 				"description": "Starting node path (defaults to scene tree root)"
 			}
-		}, []),
+		}, [], {
+			"type": "object",
+			"properties": {
+				"root": {"type": "object", "description": "Root node with nested children hierarchy"}
+			}
+		}),
 		tools._execute_get_node_tree
 	)
 
@@ -104,11 +164,7 @@ func _execute_get_node(args: Dictionary) -> Dictionary:
 	if node.get_script() != null:
 		data["script"] = node.get_script().resource_path
 
-	return {
-		"content": [{"type": "text", "text": "Node: %s (%s)" % [node.name, node.get_class()]}],
-		"isError": false,
-		"data": data
-	}
+	return MCPToolRegistry.create_response("Node: %s (%s)" % [node.name, node.get_class()], data)
 
 
 func _execute_get_property(args: Dictionary) -> Dictionary:
@@ -133,11 +189,7 @@ func _execute_get_property(args: Dictionary) -> Dictionary:
 		"type": value_type
 	}
 
-	return {
-		"content": [{"type": "text", "text": "%s: %s" % [property, str(value)]}],
-		"isError": false,
-		"data": data
-	}
+	return MCPToolRegistry.create_response("%s: %s" % [property, str(value)], data)
 
 
 func _execute_set_property(args: Dictionary) -> Dictionary:
@@ -184,16 +236,12 @@ func _execute_set_property(args: Dictionary) -> Dictionary:
 	# Set the property
 	node.set(property, value)
 
-	return {
-		"content": [{"type": "text", "text": "Set %s = %s" % [property, str(value)]}],
-		"isError": false,
-		"data": {
-			"path": path,
-			"property": property,
-			"old_value": _variant_to_json(old_value),
-			"new_value": _variant_to_json(value)
-		}
-	}
+	return MCPToolRegistry.create_response("Set %s = %s" % [property, str(value)], {
+		"path": path,
+		"property": property,
+		"old_value": _variant_to_json(old_value),
+		"new_value": _variant_to_json(value)
+	})
 
 
 func _execute_call_method(args: Dictionary) -> Dictionary:
@@ -219,16 +267,12 @@ func _execute_call_method(args: Dictionary) -> Dictionary:
 
 	result = node.callv(method, args_array)
 
-	return {
-		"content": [{"type": "text", "text": "Called %s" % method}],
-		"isError": false,
-		"data": {
-			"path": path,
-			"method": method,
-			"result": _variant_to_json(result),
-			"success": true
-		}
-	}
+	return MCPToolRegistry.create_response("Called %s" % method, {
+		"path": path,
+		"method": method,
+		"result": _variant_to_json(result),
+		"success": true
+	})
 
 
 func _execute_get_performance(_args: Dictionary = {}) -> Dictionary:
@@ -248,11 +292,7 @@ func _execute_get_performance(_args: Dictionary = {}) -> Dictionary:
 		data.draw_calls
 	]
 
-	return {
-		"content": [{"type": "text", "text": text}],
-		"isError": false,
-		"data": data
-	}
+	return MCPToolRegistry.create_response(text, data)
 
 
 func _execute_list_children(args: Dictionary) -> Dictionary:
@@ -265,15 +305,11 @@ func _execute_list_children(args: Dictionary) -> Dictionary:
 
 	var children: Array[Dictionary] = _get_children_list(node, recursive)
 
-	return {
-		"content": [{"type": "text", "text": "Found %d children" % children.size()}],
-		"isError": false,
-		"data": {
-			"path": str(node.get_path()),
-			"children": children,
-			"count": children.size()
-		}
-	}
+	return MCPToolRegistry.create_response("Found %d children" % children.size(), {
+		"path": str(node.get_path()),
+		"children": children,
+		"count": children.size()
+	})
 
 
 func _execute_get_node_tree(args: Dictionary) -> Dictionary:
@@ -294,11 +330,9 @@ func _execute_get_node_tree(args: Dictionary) -> Dictionary:
 	var tree_data: Dictionary = _build_runtime_tree(root)
 	var tree_text: String = _format_tree_text(tree_data, "")
 
-	return {
-		"content": [{"type": "text", "text": "Runtime scene tree:\n%s" % tree_text}],
-		"isError": false,
-		"data": {"root": tree_data}
-	}
+	return MCPToolRegistry.create_response("Runtime scene tree:\n%s" % tree_text, {
+		"root": tree_data
+	})
 
 
 func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
@@ -460,12 +494,15 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 	return value
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

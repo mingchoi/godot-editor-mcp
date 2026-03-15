@@ -3,6 +3,8 @@
 extends RefCounted
 class_name RuntimeNodeTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 ## Registers all runtime node tools
 ## Returns the tool instance to prevent garbage collection
 static func register(registry: RefCounted) -> RefCounted:
@@ -14,14 +16,28 @@ static func register(registry: RefCounted) -> RefCounted:
 			"parent": {"type": "string", "description": "Parent node path"},
 			"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
 			"properties": {"type": "object", "default": {}, "description": "Initial property values"}
-		}, ["type", "parent"]),
+		}, ["type", "parent"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Full path of created node"},
+				"name": {"type": "string", "description": "Node name"},
+				"type": {"type": "string", "description": "Godot class name"}
+			}
+		}),
 		tools._execute_node_create
 	)
 
 	registry.register_tool(
 		_create_tool_def("runtime_node_delete", "Deletes a node from the running game", {
 			"path": {"type": "string", "description": "Node path to delete"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path of deleted node"},
+				"name": {"type": "string", "description": "Name of deleted node"},
+				"deleted": {"type": "boolean", "description": "Whether deletion succeeded"}
+			}
+		}),
 		tools._execute_node_delete
 	)
 
@@ -32,7 +48,14 @@ static func register(registry: RefCounted) -> RefCounted:
 			"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"},
 			"position": {"type": "object", "default": {}, "description": "Initial position as {x, y, z} for 3D or {x, y} for 2D nodes"},
 			"rotation": {"type": "object", "default": {}, "description": "Initial rotation in degrees as {x, y, z} for 3D or {x, y, angle} for 2D nodes"}
-		}, ["scene_path", "parent"]),
+		}, ["scene_path", "parent"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Full path of instantiated scene"},
+				"name": {"type": "string", "description": "Instance root node name"},
+				"scene_path": {"type": "string", "description": "Source scene file path"}
+			}
+		}),
 		tools._execute_instantiate_scene
 	)
 
@@ -99,16 +122,12 @@ func _execute_node_create(args: Dictionary) -> Dictionary:
 
 	var full_path: String = "%s/%s" % [parent_path, new_node.name]
 
-	return {
-		"content": [{"type": "text", "text": "Created node: %s" % full_path}],
-		"isError": false,
-		"data": {
-			"path": str(new_node.get_path()),
-			"name": new_node.name,
-			"type": node_type,
-			"actual_name": new_node.name
-		}
-	}
+	return MCPToolRegistry.create_response("Created node: %s" % full_path, {
+		"path": str(new_node.get_path()),
+		"name": new_node.name,
+		"type": node_type,
+		"actual_name": new_node.name
+	})
 
 
 func _execute_node_delete(args: Dictionary) -> Dictionary:
@@ -133,15 +152,11 @@ func _execute_node_delete(args: Dictionary) -> Dictionary:
 
 	node.queue_free()
 
-	return {
-		"content": [{"type": "text", "text": "Deleted node: %s" % path}],
-		"isError": false,
-		"data": {
-			"path": node_path,
-			"name": node_name,
-			"deleted": true
-		}
-	}
+	return MCPToolRegistry.create_response("Deleted node: %s" % path, {
+		"path": node_path,
+		"name": node_name,
+		"deleted": true
+	})
 
 
 func _execute_instantiate_scene(args: Dictionary) -> Dictionary:
@@ -217,18 +232,14 @@ func _execute_instantiate_scene(args: Dictionary) -> Dictionary:
 	var instance_path: String = str(instance.get_path())
 	var child_count: int = instance.get_child_count()
 
-	return {
-		"content": [{"type": "text", "text": "Instantiated scene: %s" % instance_path}],
-		"isError": false,
-		"data": {
-			"path": instance_path,
-			"name": instance.name,
-			"scene_path": scene_path,
-			"child_count": child_count,
-			"position": position_data,
-			"rotation": rotation_data
-		}
-	}
+	return MCPToolRegistry.create_response("Instantiated scene: %s" % instance_path, {
+		"path": instance_path,
+		"name": instance.name,
+		"scene_path": scene_path,
+		"child_count": child_count,
+		"position": position_data,
+		"rotation": rotation_data
+	})
 
 
 # --- Type Conversion Helpers ---
@@ -345,12 +356,15 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 	return value
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

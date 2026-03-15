@@ -35,3 +35,15 @@ func has_tool(tool_name: String) -> bool:
 ## Get the number of registered tools
 func size() -> int:
 	return _tools.size()
+
+
+## Create an MCP-compliant response with optional structured content
+## Per MCP spec, structuredContent is a separate field from content array
+static func create_response(message: String, data: Dictionary = {}, is_error: bool = false) -> Dictionary:
+	var response: Dictionary = {
+		"content": [{"type": "text", "text": message}],
+		"isError": is_error
+	}
+	if not data.is_empty():
+		response["structuredContent"] = data
+	return response

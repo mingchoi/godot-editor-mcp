@@ -3,6 +3,8 @@
 extends RefCounted
 class_name EditorCaptureTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -20,12 +22,33 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"filename": {"type": "string", "description": "Custom filename (without extension). If not provided, auto-generates timestamp-based name"},
 			"format": {"type": "string", "enum": ["png", "jpg"], "default": "png", "description": "Image format. PNG for lossless, JPG for smaller files"},
 			"quality": {"type": "integer", "minimum": 1, "maximum": 100, "default": 90, "description": "JPG quality (1-100). Only used when format is jpg"}
-		}, []),
+		}, [], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Relative path in user:// directory"},
+				"absolute_path": {"type": "string", "description": "Absolute file system path"},
+				"filename": {"type": "string", "description": "Filename with extension"},
+				"format": {"type": "string", "description": "Image format (png or jpg)"},
+				"size_bytes": {"type": "integer", "description": "File size in bytes"},
+				"width": {"type": "integer", "description": "Image width in pixels"},
+				"height": {"type": "integer", "description": "Image height in pixels"},
+				"captured_at": {"type": "string", "description": "ISO 8601 timestamp"},
+				"source": {"type": "string", "description": "Screenshot source (editor)"},
+				"viewport_type": {"type": "string", "description": "Viewport type (3D or 2D)"}
+			}
+		}),
 		tools._execute_capture_editor
 	)
 
 	registry.register_tool(
-		_create_tool_def("screenshot_list", "Lists all captured screenshots in the MCP screenshots directory with metadata", {}, []),
+		_create_tool_def("screenshot_list", "Lists all captured screenshots in the MCP screenshots directory with metadata", {}, [], {
+			"type": "object",
+			"properties": {
+				"count": {"type": "integer", "description": "Number of screenshots"},
+				"total_size_bytes": {"type": "integer", "description": "Total size in bytes"},
+				"screenshots": {"type": "array", "items": {"type": "object"}, "description": "Array of screenshot info"}
+			}
+		}),
 		tools._execute_list
 	)
 
@@ -76,22 +99,18 @@ func _execute_capture_editor(args: Dictionary) -> Dictionary:
 	if not result.get("success", false):
 		return {"content": [{"type": "text", "text": "Error: %s" % result.get("error", "Failed to capture screenshot")}], "isError": true}
 
-	return {
-		"content": [{"type": "text", "text": "Editor screenshot saved (%s viewport): %s" % [viewport_type, result.absolute_path]}],
-		"isError": false,
-		"data": {
-			"path": result.path,
-			"absolute_path": result.absolute_path,
-			"filename": result.filename,
-			"format": result.format,
-			"size_bytes": result.size_bytes,
-			"width": result.width,
-			"height": result.height,
-			"captured_at": result.captured_at,
-			"source": "editor",
-			"viewport_type": viewport_type
-		}
-	}
+	return MCPToolRegistry.create_response("Editor screenshot saved (%s viewport): %s" % [viewport_type, result.absolute_path], {
+		"path": result.path,
+		"absolute_path": result.absolute_path,
+		"filename": result.filename,
+		"format": result.format,
+		"size_bytes": result.size_bytes,
+		"width": result.width,
+		"height": result.height,
+		"captured_at": result.captured_at,
+		"source": "editor",
+		"viewport_type": viewport_type
+	})
 
 
 func _execute_list(_args: Dictionary) -> Dictionary:
@@ -106,19 +125,22 @@ func _execute_list(_args: Dictionary) -> Dictionary:
 	for info: Dictionary in screenshots:
 		lines.append("  - %s" % info.get("absolute_path", info.get("filename", "unknown")))
 
-	return {
-		"content": [{"type": "text", "text": "\n".join(lines)}],
-		"isError": false,
-		"data": {"count": screenshots.size(), "total_size_bytes": total_size, "screenshots": screenshots}
-	}
+	return MCPToolRegistry.create_response("\n".join(lines), {
+		"count": screenshots.size(),
+		"total_size_bytes": total_size,
+		"screenshots": screenshots
+	})
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

@@ -3,6 +3,8 @@
 extends RefCounted
 class_name WarningCheckerTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -18,18 +20,33 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 	registry.register_tool(
 		_create_tool_def("editor_get_node_warnings", "Gets configuration warnings for a specific node in the current scene. Returns warnings that Godot would normally display in the editor for improperly configured nodes.", {
 			"path": {"type": "string", "description": "Node path in the scene tree. Can be absolute (/root/Main/Player) or relative (Main/Player)"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Absolute path of the checked node"},
+				"node_name": {"type": "string", "description": "Node name (not full path)"},
+				"class_name": {"type": "string", "description": "Godot class name of the node"},
+				"warnings": {"type": "array", "items": {"type": "string"}, "description": "Array of warning messages. Empty if no warnings"}
+			}
+		}),
 		tools._execute_get_node_warnings
 	)
 
 	registry.register_tool(
-		_create_tool_def("editor_get_scene_warnings", "Gets configuration warnings for all nodes in the current scene. Returns a comprehensive list of warnings across the entire scene.", {}, []),
+		_create_tool_def("editor_get_scene_warnings", "Gets configuration warnings for all nodes in the current scene. Returns a comprehensive list of warnings across the entire scene.", {}, [], {
+			"type": "object",
+			"properties": {
+				"total_nodes_checked": {"type": "integer", "description": "Total number of nodes examined"},
+				"nodes_with_warnings": {"type": "integer", "description": "Number of nodes that have warnings"},
+				"warnings": {"type": "array", "items": {"type": "object"}, "description": "Array of node warning results"}
+			}
+		}),
 		tools._execute_get_scene_warnings
 	)
 
 	registry.register_tool(
 		_create_tool_def("editor_get_warning_types", "Queries available configuration warning types for Godot node classes. Returns information about which node classes have configuration warnings.", {
-			"class_name": {"type": "string", "description": "Optional filter for a specific node class", "required": false}
+			"class_name": {"type": "string", "description": "Optional filter for a specific node class"}
 		}, []),
 		tools._execute_get_warning_types
 	)
@@ -476,21 +493,23 @@ func _execute_get_node_warnings(args: Dictionary) -> Dictionary:
 
 	# Return appropriate message based on warnings
 	if warnings.is_empty():
-		return {
-			"content": [{"type": "text", "text": "Node %s has no configuration warnings" % node.name}],
-			"isError": false,
-			"data": {"path": path, "node_name": node.name, "class_name": node.get_class(), "warnings": []}
-		}
+		return MCPToolRegistry.create_response("Node %s has no configuration warnings" % node.name, {
+			"path": path,
+			"node_name": node.name,
+			"class_name": node.get_class(),
+			"warnings": []
+		})
 	else:
 		var warning_count: int = warnings.size()
 		var message := "Node %s has %d configuration warning(s):\n" % [node.name, warning_count]
 		for i in range(warning_count):
 			message += "  %d. %s\n" % [i + 1, warnings[i]]
-		return {
-			"content": [{"type": "text", "text": message}],
-			"isError": false,
-			"data": {"path": path, "node_name": node.name, "class_name": node.get_class(), "warnings": warnings}
-		}
+		return MCPToolRegistry.create_response(message, {
+			"path": path,
+			"node_name": node.name,
+			"class_name": node.get_class(),
+			"warnings": warnings
+		})
 
 
 ## Executes the editor_get_scene_warnings tool
@@ -510,11 +529,11 @@ func _execute_get_scene_warnings(_args: Dictionary) -> Dictionary:
 
 	# Build response
 	if warnings.is_empty():
-		return {
-			"content": [{"type": "text", "text": "No configuration warnings found in scene (checked %d node(s))" % total_nodes}],
-			"isError": false,
-			"data": {"total_nodes_checked": total_nodes, "nodes_with_warnings": 0, "warnings": []}
-		}
+		return MCPToolRegistry.create_response("No configuration warnings found in scene (checked %d node(s))" % total_nodes, {
+			"total_nodes_checked": total_nodes,
+			"nodes_with_warnings": 0,
+			"warnings": []
+		})
 	else:
 		var message := "Found %d configuration warning(s) across %d node(s) in scene:\n\n" % [warnings.size(), total_nodes]
 		for warning_result in warnings:
@@ -522,11 +541,11 @@ func _execute_get_scene_warnings(_args: Dictionary) -> Dictionary:
 			for w in warning_result.warnings:
 				message += "  - %s\n" % w
 			message += "\n"
-		return {
-			"content": [{"type": "text", "text": message}],
-			"isError": false,
-			"data": {"total_nodes_checked": total_nodes, "nodes_with_warnings": warnings.size(), "warnings": warnings}
-		}
+		return MCPToolRegistry.create_response(message, {
+			"total_nodes_checked": total_nodes,
+			"nodes_with_warnings": warnings.size(),
+			"warnings": warnings
+		})
 
 
 ## Recursively collects warnings from all nodes in the scene tree
@@ -553,11 +572,7 @@ func _collect_warnings_recursive(node: Node, warnings: Array) -> int:
 
 ## Executes the editor_get_warning_types tool (placeholder for future implementation)
 func _execute_get_warning_types(_args: Dictionary) -> Dictionary:
-	return {
-		"content": [{"type": "text", "text": "Warning types tool not yet implemented"}],
-		"isError": true,
-		"data": {}
-	}
+	return MCPToolRegistry.create_response("Warning types tool not yet implemented", {}, true)
 
 
 ## Resolves a node path from the editor context
@@ -580,12 +595,15 @@ func _resolve_node(path: String) -> Node:
 	return scene_root.get_node_or_null(path)
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

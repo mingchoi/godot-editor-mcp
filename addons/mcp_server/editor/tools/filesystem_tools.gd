@@ -3,6 +3,8 @@
 extends RefCounted
 class_name FileSystemTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -20,7 +22,14 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"path": {"type": "string", "default": "res://", "description": "Directory path"},
 			"recursive": {"type": "boolean", "default": false},
 			"filter": {"type": "string", "description": "File extension filter (e.g., '*.gd')"}
-		}, []),
+		}, [], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Directory path that was listed"},
+				"directories": {"type": "array", "items": {"type": "string"}, "description": "Directory names"},
+				"files": {"type": "array", "items": {"type": "object"}, "description": "File info with name, path, type, size"}
+			}
+		}),
 		tools._execute_list_dir
 	)
 
@@ -29,7 +38,14 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"path": {"type": "string", "description": "File path"},
 			"start_line": {"type": "integer", "default": 1},
 			"end_line": {"type": "integer", "description": "End line (inclusive)"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "File path that was read"},
+				"content": {"type": "string", "description": "File content"},
+				"line_count": {"type": "integer", "description": "Number of lines in content"}
+			}
+		}),
 		tools._execute_read_file
 	)
 
@@ -38,7 +54,14 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"path": {"type": "string", "description": "File path"},
 			"content": {"type": "string", "description": "Content to write"},
 			"mode": {"type": "string", "enum": ["write", "append"], "default": "write"}
-		}, ["path", "content"]),
+		}, ["path", "content"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "File path that was written"},
+				"mode": {"type": "string", "description": "Write mode used"},
+				"bytes_written": {"type": "integer", "description": "Number of bytes written"}
+			}
+		}),
 		tools._execute_write_file
 	)
 
@@ -46,7 +69,12 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("fs_delete", "Deletes a file or directory", {
 			"path": {"type": "string", "description": "Path to delete"},
 			"recursive": {"type": "boolean", "default": false, "description": "Delete directory contents"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path that was deleted"}
+			}
+		}),
 		tools._execute_delete
 	)
 
@@ -54,7 +82,13 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("fs_copy", "Copies a file", {
 			"source": {"type": "string", "description": "Source file path"},
 			"destination": {"type": "string", "description": "Destination file path"}
-		}, ["source", "destination"]),
+		}, ["source", "destination"], {
+			"type": "object",
+			"properties": {
+				"source": {"type": "string", "description": "Source file path"},
+				"destination": {"type": "string", "description": "Destination file path"}
+			}
+		}),
 		tools._execute_copy
 	)
 
@@ -62,7 +96,13 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("fs_move", "Moves or renames a file", {
 			"source": {"type": "string", "description": "Source file path"},
 			"destination": {"type": "string", "description": "Destination file path"}
-		}, ["source", "destination"]),
+		}, ["source", "destination"], {
+			"type": "object",
+			"properties": {
+				"source": {"type": "string", "description": "Source file path"},
+				"destination": {"type": "string", "description": "Destination file path"}
+			}
+		}),
 		tools._execute_move
 	)
 
@@ -85,11 +125,11 @@ func _execute_list_dir(args: Dictionary) -> Dictionary:
 
 	_list_dir_recursive(path, recursive, filter_pattern, directories, files)
 
-	return {
-		"content": [{"type": "text", "text": "Found %d files and %d directories in %s" % [files.size(), directories.size(), path]}],
-		"isError": false,
-		"data": {"path": path, "directories": directories, "files": files}
-	}
+	return MCPToolRegistry.create_response("Found %d files and %d directories in %s" % [files.size(), directories.size(), path], {
+		"path": path,
+		"directories": directories,
+		"files": files
+	})
 
 
 func _list_dir_recursive(
@@ -162,11 +202,11 @@ func _execute_read_file(args: Dictionary) -> Dictionary:
 			selected_lines.append(lines[i])
 		content = "\n".join(selected_lines)
 
-	return {
-		"content": [{"type": "text", "text": "Read file: %s" % path}],
-		"isError": false,
-		"data": {"path": path, "content": content, "line_count": content.split("\n").size()}
-	}
+	return MCPToolRegistry.create_response("Read file: %s" % path, {
+		"path": path,
+		"content": content,
+		"line_count": content.split("\n").size()
+	})
 
 
 func _execute_write_file(args: Dictionary) -> Dictionary:
@@ -197,11 +237,11 @@ func _execute_write_file(args: Dictionary) -> Dictionary:
 	file.store_string(content)
 	file.close()
 
-	return {
-		"content": [{"type": "text", "text": "File written: %s" % path}],
-		"isError": false,
-		"data": {"path": path, "mode": mode, "bytes_written": content.length()}
-	}
+	return MCPToolRegistry.create_response("File written: %s" % path, {
+		"path": path,
+		"mode": mode,
+		"bytes_written": content.length()
+	})
 
 
 func _execute_delete(args: Dictionary) -> Dictionary:
@@ -224,11 +264,9 @@ func _execute_delete(args: Dictionary) -> Dictionary:
 	if err != OK:
 		return {"content": [{"type": "text", "text": "Error: Failed to delete: %s (error: %d)" % [path, err]}], "isError": true}
 
-	return {
-		"content": [{"type": "text", "text": "Deleted: %s" % path}],
-		"isError": false,
-		"data": {"path": path}
-	}
+	return MCPToolRegistry.create_response("Deleted: %s" % path, {
+		"path": path
+	})
 
 
 func _delete_directory_recursive(path: String) -> Error:
@@ -273,11 +311,10 @@ func _execute_copy(args: Dictionary) -> Dictionary:
 	if err != OK:
 		return {"content": [{"type": "text", "text": "Error: Failed to copy file (error: %d)" % err}], "isError": true}
 
-	return {
-		"content": [{"type": "text", "text": "Copied: %s -> %s" % [source, destination]}],
-		"isError": false,
-		"data": {"source": source, "destination": destination}
-	}
+	return MCPToolRegistry.create_response("Copied: %s -> %s" % [source, destination], {
+		"source": source,
+		"destination": destination
+	})
 
 
 func _execute_move(args: Dictionary) -> Dictionary:
@@ -307,11 +344,10 @@ func _execute_move(args: Dictionary) -> Dictionary:
 	if err != OK:
 		return {"content": [{"type": "text", "text": "Error: Failed to move (error: %d)" % err}], "isError": true}
 
-	return {
-		"content": [{"type": "text", "text": "Moved: %s -> %s" % [source, destination]}],
-		"isError": false,
-		"data": {"source": source, "destination": destination}
-	}
+	return MCPToolRegistry.create_response("Moved: %s -> %s" % [source, destination], {
+		"source": source,
+		"destination": destination
+	})
 
 
 func _get_file_type(file_name: String) -> String:
@@ -342,12 +378,15 @@ func _get_file_size(path: String) -> int:
 	return size
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

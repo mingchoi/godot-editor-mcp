@@ -18,6 +18,8 @@
 extends RefCounted
 class_name EditorLogTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -31,7 +33,14 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 	var tools := EditorLogTools.new(editor_interface)
 
 	registry.register_tool(
-		_create_tool_def("editor_get_output_log", "Retrieves the current content of the Godot editor's output panel log. Returns the full text content along with metadata including character count.", {}, []),
+		_create_tool_def("editor_get_output_log", "Retrieves the current content of the Godot editor's output panel log. Returns the full text content along with metadata including character count.", {}, [], {
+			"type": "object",
+			"properties": {
+				"content": {"type": "string", "description": "The full log text content from the output panel"},
+				"character_count": {"type": "integer", "description": "Number of characters in the content"},
+				"is_empty": {"type": "boolean", "description": "Whether the content is empty"}
+			}
+		}),
 		tools._execute_get_output_log
 	)
 
@@ -54,17 +63,16 @@ func _execute_get_output_log(_args: Dictionary) -> Dictionary:
 	var char_count := log_text.length()
 
 	if char_count == 0:
-		return {
-			"content": [{"type": "text", "text": "Editor output panel is empty"}],
-			"isError": false,
-			"data": {"content": "", "character_count": 0, "is_empty": true}
-		}
+		return MCPToolRegistry.create_response("Editor output panel is empty", {
+			"content": "",
+			"character_count": 0,
+			"is_empty": true
+		})
 
-	return {
-		"content": [{"type": "text", "text": log_text}],
-		"isError": false,
-		"data": {"character_count": char_count, "is_empty": false}
-	}
+	return MCPToolRegistry.create_response(log_text, {
+		"character_count": char_count,
+		"is_empty": false
+	})
 
 
 # --- Helper Functions ---
@@ -128,12 +136,15 @@ func _find_node_by_name(root: Node, target_name: String) -> Node:
 	return null
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

@@ -3,6 +3,8 @@
 extends RefCounted
 class_name SelectionTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -16,7 +18,13 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 	var tools := SelectionTools.new(editor_interface)
 
 	registry.register_tool(
-		_create_tool_def("selection_get", "Gets currently selected nodes in the editor", {}, []),
+		_create_tool_def("selection_get", "Gets currently selected nodes in the editor", {}, [], {
+			"type": "object",
+			"properties": {
+				"count": {"type": "integer", "description": "Number of selected nodes"},
+				"nodes": {"type": "array", "items": {"type": "object"}, "description": "Array of selected node info with path, name, type"}
+			}
+		}),
 		tools._execute_get
 	)
 
@@ -24,12 +32,24 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("selection_set", "Sets the editor selection", {
 			"paths": {"type": "array", "items": {"type": "string"}, "description": "Node paths to select"},
 			"additive": {"type": "boolean", "default": false, "description": "Add to current selection"}
-		}, ["paths"]),
+		}, ["paths"], {
+			"type": "object",
+			"properties": {
+				"count": {"type": "integer", "description": "Number of nodes selected"},
+				"requested": {"type": "integer", "description": "Number of paths requested"},
+				"errors": {"type": "array", "items": {"type": "string"}, "description": "Error messages for failed selections"}
+			}
+		}),
 		tools._execute_set
 	)
 
 	registry.register_tool(
-		_create_tool_def("selection_clear", "Clears the editor selection", {}, []),
+		_create_tool_def("selection_clear", "Clears the editor selection", {}, [], {
+			"type": "object",
+			"properties": {
+				"cleared_count": {"type": "integer", "description": "Number of nodes that were selected"}
+			}
+		}),
 		tools._execute_clear
 	)
 
@@ -48,11 +68,10 @@ func _execute_get(_args: Dictionary) -> Dictionary:
 
 	var selection: EditorSelection = _get_selection()
 	if selection == null:
-		return {
-			"content": [{"type": "text", "text": "No selection available"}],
-			"isError": false,
-			"data": {"count": 0, "nodes": []}
-		}
+		return MCPToolRegistry.create_response("No selection available", {
+			"count": 0,
+			"nodes": []
+		})
 
 	var selected_nodes: Array[Node] = selection.get_selected_nodes()
 	var nodes_info: Array[Dictionary] = []
@@ -64,11 +83,10 @@ func _execute_get(_args: Dictionary) -> Dictionary:
 			"type": node.get_class()
 		})
 
-	return {
-		"content": [{"type": "text", "text": "%d node(s) selected" % nodes_info.size()}],
-		"isError": false,
-		"data": {"count": nodes_info.size(), "nodes": nodes_info}
-	}
+	return MCPToolRegistry.create_response("%d node(s) selected" % nodes_info.size(), {
+		"count": nodes_info.size(),
+		"nodes": nodes_info
+	})
 
 
 func _execute_set(args: Dictionary) -> Dictionary:
@@ -111,11 +129,7 @@ func _execute_set(args: Dictionary) -> Dictionary:
 	if not errors.is_empty():
 		data["errors"] = errors
 
-	return {
-		"content": [{"type": "text", "text": "Selected %d node(s)" % selected_count}],
-		"isError": false,
-		"data": data
-	}
+	return MCPToolRegistry.create_response("Selected %d node(s)" % selected_count, data)
 
 
 func _execute_clear(_args: Dictionary) -> Dictionary:
@@ -129,19 +143,20 @@ func _execute_clear(_args: Dictionary) -> Dictionary:
 	var count: int = selection.get_selected_nodes().size()
 	selection.clear()
 
-	return {
-		"content": [{"type": "text", "text": "Cleared selection (%d nodes)" % count}],
-		"isError": false,
-		"data": {"cleared_count": count}
-	}
+	return MCPToolRegistry.create_response("Cleared selection (%d nodes)" % count, {
+		"cleared_count": count
+	})
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

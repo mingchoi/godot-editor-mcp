@@ -3,6 +3,8 @@
 extends RefCounted
 class_name ScriptTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -20,12 +22,26 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"path": {"type": "string", "description": "Script file path"},
 			"line": {"type": "integer", "default": 1, "description": "Line to scroll to"},
 			"column": {"type": "integer", "default": 0, "description": "Column position"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Script file path that was opened"},
+				"line": {"type": "integer", "description": "Line number scrolled to"},
+				"column": {"type": "integer", "description": "Column position"}
+			}
+		}),
 		tools._execute_open
 	)
 
 	registry.register_tool(
-		_create_tool_def("script_get_current", "Gets the currently edited script", {}, []),
+		_create_tool_def("script_get_current", "Gets the currently edited script", {}, [], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Script file path (empty if none)"},
+				"has_script": {"type": "boolean", "description": "Whether a script is currently open"},
+				"language": {"type": "string", "description": "Script language (GDScript, C#, etc.)"}
+			}
+		}),
 		tools._execute_get_current
 	)
 
@@ -54,11 +70,11 @@ func _execute_open(args: Dictionary) -> Dictionary:
 	# Open in editor
 	_editor_interface.edit_script(script, line - 1, column)  # Line is 0-indexed in API
 
-	return {
-		"content": [{"type": "text", "text": "Opened script: %s at line %d" % [path, line]}],
-		"isError": false,
-		"data": {"path": path, "line": line, "column": column}
-	}
+	return MCPToolRegistry.create_response("Opened script: %s at line %d" % [path, line], {
+		"path": path,
+		"line": line,
+		"column": column
+	})
 
 
 func _execute_get_current(_args: Dictionary) -> Dictionary:
@@ -68,17 +84,16 @@ func _execute_get_current(_args: Dictionary) -> Dictionary:
 	var script: Script = _editor_interface.get_current_script()
 
 	if script == null:
-		return {
-			"content": [{"type": "text", "text": "No script is currently open"}],
-			"isError": false,
-			"data": {"path": "", "has_script": false}
-		}
+		return MCPToolRegistry.create_response("No script is currently open", {
+			"path": "",
+			"has_script": false
+		})
 
-	return {
-		"content": [{"type": "text", "text": "Current script: %s" % script.resource_path}],
-		"isError": false,
-		"data": {"path": script.resource_path, "has_script": true, "language": _get_script_language(script)}
-	}
+	return MCPToolRegistry.create_response("Current script: %s" % script.resource_path, {
+		"path": script.resource_path,
+		"has_script": true,
+		"language": _get_script_language(script)
+	})
 
 
 func _get_script_language(script: Script) -> String:
@@ -88,12 +103,15 @@ func _get_script_language(script: Script) -> String:
 	return "Unknown"
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

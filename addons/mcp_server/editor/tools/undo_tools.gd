@@ -3,6 +3,8 @@
 extends RefCounted
 class_name UndoTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -18,14 +20,26 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 	registry.register_tool(
 		_create_tool_def("editor_undo", "Undoes the last action", {
 			"steps": {"type": "integer", "default": 1, "minimum": 1, "description": "Number of steps to undo"}
-		}, []),
+		}, [], {
+			"type": "object",
+			"properties": {
+				"steps": {"type": "integer", "description": "Number of actions undone"},
+				"has_more": {"type": "boolean", "description": "Whether more undo actions are available"}
+			}
+		}),
 		tools._execute_undo
 	)
 
 	registry.register_tool(
 		_create_tool_def("editor_redo", "Redoes the last undone action", {
 			"steps": {"type": "integer", "default": 1, "minimum": 1, "description": "Number of steps to redo"}
-		}, []),
+		}, [], {
+			"type": "object",
+			"properties": {
+				"steps": {"type": "integer", "description": "Number of actions redone"},
+				"has_more": {"type": "boolean", "description": "Whether more redo actions are available"}
+			}
+		}),
 		tools._execute_redo
 	)
 
@@ -52,11 +66,10 @@ func _execute_undo(args: Dictionary) -> Dictionary:
 		undo_redo.undo()
 		actual_steps += 1
 
-	return {
-		"content": [{"type": "text", "text": "Undid %d action(s)" % actual_steps}],
-		"isError": false,
-		"data": {"steps": actual_steps, "has_more": undo_redo.has_undo()}
-	}
+	return MCPToolRegistry.create_response("Undid %d action(s)" % actual_steps, {
+		"steps": actual_steps,
+		"has_more": undo_redo.has_undo()
+	})
 
 
 func _execute_redo(args: Dictionary) -> Dictionary:
@@ -77,19 +90,21 @@ func _execute_redo(args: Dictionary) -> Dictionary:
 		undo_redo.redo()
 		actual_steps += 1
 
-	return {
-		"content": [{"type": "text", "text": "Redid %d action(s)" % actual_steps}],
-		"isError": false,
-		"data": {"steps": actual_steps, "has_more": undo_redo.has_redo()}
-	}
+	return MCPToolRegistry.create_response("Redid %d action(s)" % actual_steps, {
+		"steps": actual_steps,
+		"has_more": undo_redo.has_redo()
+	})
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

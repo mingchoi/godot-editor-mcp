@@ -3,6 +3,8 @@
 extends RefCounted
 class_name NodeTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -20,7 +22,17 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"path": {"type": "string", "description": "Node path (e.g., 'Main/Player' or '/root/Main/Player')"},
 			"include_properties": {"type": "boolean", "default": false, "description": "Include all property values"},
 			"include_children": {"type": "boolean", "default": false, "description": "Include list of child node names"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Absolute path of the node"},
+				"name": {"type": "string", "description": "Node name"},
+				"type": {"type": "string", "description": "Godot class name"},
+				"script": {"type": "string", "description": "Script resource path if attached"},
+				"properties": {"type": "object", "description": "Property values (if include_properties=true)"},
+				"children": {"type": "array", "items": {"type": "string"}, "description": "Child node names (if include_children=true)"}
+			}
+		}),
 		tools._execute_get
 	)
 
@@ -28,7 +40,15 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("node_get_property", "Gets a specific property value from a node", {
 			"path": {"type": "string", "description": "Node path"},
 			"property": {"type": "string", "description": "Property name"}
-		}, ["path", "property"]),
+		}, ["path", "property"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"property": {"type": "string", "description": "Property name"},
+				"value": {"description": "Property value"},
+				"type": {"type": "string", "description": "Godot type name"}
+			}
+		}),
 		tools._execute_get_property
 	)
 
@@ -37,7 +57,15 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"path": {"type": "string", "description": "Node path"},
 			"property": {"type": "string", "description": "Property name"},
 			"value": {"description": "New property value"}
-		}, ["path", "property", "value"]),
+		}, ["path", "property", "value"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"property": {"type": "string", "description": "Property name"},
+				"old_value": {"description": "Previous value"},
+				"new_value": {"description": "New value"}
+			}
+		}),
 		tools._execute_set_property
 	)
 
@@ -47,14 +75,27 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 			"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
 			"parent": {"type": "string", "description": "Parent node path"},
 			"properties": {"type": "object", "default": {}, "description": "Initial property values"}
-		}, ["type", "parent"]),
+		}, ["type", "parent"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Full path of created node"},
+				"name": {"type": "string", "description": "Node name"},
+				"type": {"type": "string", "description": "Godot class name"}
+			}
+		}),
 		tools._execute_create
 	)
 
 	registry.register_tool(
 		_create_tool_def("node_delete", "Deletes a node", {
 			"path": {"type": "string", "description": "Node path to delete"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path of deleted node"},
+				"name": {"type": "string", "description": "Name of deleted node"}
+			}
+		}),
 		tools._execute_delete
 	)
 
@@ -62,7 +103,14 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("node_list_children", "Lists all children of a node", {
 			"path": {"type": "string", "description": "Parent node path"},
 			"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Parent node path"},
+				"children": {"type": "array", "items": {"type": "object"}, "description": "Array of child node info"},
+				"count": {"type": "integer", "description": "Number of children"}
+			}
+		}),
 		tools._execute_list_children
 	)
 
@@ -70,7 +118,14 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("node_duplicate", "Duplicates a node", {
 			"path": {"type": "string", "description": "Node to duplicate"},
 			"new_name": {"type": "string", "description": "Name for the duplicate"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"original_path": {"type": "string", "description": "Path of original node"},
+				"duplicate_path": {"type": "string", "description": "Path of duplicated node"},
+				"name": {"type": "string", "description": "Name of duplicate"}
+			}
+		}),
 		tools._execute_duplicate
 	)
 
@@ -78,7 +133,15 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		_create_tool_def("node_pack_as_scene", "Saves a node branch as a new scene file and converts the node to an instance", {
 			"path": {"type": "string", "description": "Source node path to pack"},
 			"destination": {"type": "string", "description": "Destination file path (e.g., 'res://scenes/new.tscn')"}
-		}, ["path", "destination"]),
+		}, ["path", "destination"], {
+			"type": "object",
+			"properties": {
+				"source_path": {"type": "string", "description": "Path of node that was packed"},
+				"destination": {"type": "string", "description": "Scene file path"},
+				"saved": {"type": "boolean", "description": "Whether save succeeded"},
+				"instance_path": {"type": "string", "description": "Path of the new instance"}
+			}
+		}),
 		tools._execute_pack_as_scene
 	)
 
@@ -133,11 +196,7 @@ func _execute_get(args: Dictionary) -> Dictionary:
 			children.append(child.name)
 		data["children"] = children
 
-	return {
-		"content": [{"type": "text", "text": "Node: %s (%s)" % [node.name, node.get_class()]}],
-		"isError": false,
-		"data": data
-	}
+	return MCPToolRegistry.create_response("Node: %s (%s)" % [node.name, node.get_class()], data)
 
 
 func _execute_get_property(args: Dictionary) -> Dictionary:
@@ -164,11 +223,7 @@ func _execute_get_property(args: Dictionary) -> Dictionary:
 		"type": value_type
 	}
 
-	return {
-		"content": [{"type": "text", "text": "%s: %s" % [property, str(value)]}],
-		"isError": false,
-		"data": data
-	}
+	return MCPToolRegistry.create_response("%s: %s" % [property, str(value)], data)
 
 
 func _execute_set_property(args: Dictionary) -> Dictionary:
@@ -201,16 +256,12 @@ func _execute_set_property(args: Dictionary) -> Dictionary:
 	var old_value: Variant = node.get(property)
 	node.set(property, value)
 
-	return {
-		"content": [{"type": "text", "text": "Set %s = %s" % [property, str(value)]}],
-		"isError": false,
-		"data": {
-			"path": path,
-			"property": property,
-			"old_value": _variant_to_json(old_value),
-			"new_value": _variant_to_json(value)
-		}
-	}
+	return MCPToolRegistry.create_response("Set %s = %s" % [property, str(value)], {
+		"path": path,
+		"property": property,
+		"old_value": _variant_to_json(old_value),
+		"new_value": _variant_to_json(value)
+	})
 
 
 func _execute_create(args: Dictionary) -> Dictionary:
@@ -251,11 +302,11 @@ func _execute_create(args: Dictionary) -> Dictionary:
 
 	var full_path: String = "%s/%s" % [parent_path, new_node.name]
 
-	return {
-		"content": [{"type": "text", "text": "Created node: %s" % full_path}],
-		"isError": false,
-		"data": {"path": full_path, "name": new_node.name, "type": node_type}
-	}
+	return MCPToolRegistry.create_response("Created node: %s" % full_path, {
+		"path": full_path,
+		"name": new_node.name,
+		"type": node_type
+	})
 
 
 func _execute_delete(args: Dictionary) -> Dictionary:
@@ -276,11 +327,10 @@ func _execute_delete(args: Dictionary) -> Dictionary:
 
 	node.queue_free()
 
-	return {
-		"content": [{"type": "text", "text": "Deleted node: %s" % path}],
-		"isError": false,
-		"data": {"path": path, "name": node_name}
-	}
+	return MCPToolRegistry.create_response("Deleted node: %s" % path, {
+		"path": path,
+		"name": node_name
+	})
 
 
 func _execute_list_children(args: Dictionary) -> Dictionary:
@@ -296,11 +346,11 @@ func _execute_list_children(args: Dictionary) -> Dictionary:
 
 	var children: Array[Dictionary] = _get_children_list(node, recursive)
 
-	return {
-		"content": [{"type": "text", "text": "Found %d children" % children.size()}],
-		"isError": false,
-		"data": {"path": path, "children": children, "count": children.size()}
-	}
+	return MCPToolRegistry.create_response("Found %d children" % children.size(), {
+		"path": path,
+		"children": children,
+		"count": children.size()
+	})
 
 
 func _execute_duplicate(args: Dictionary) -> Dictionary:
@@ -329,11 +379,11 @@ func _execute_duplicate(args: Dictionary) -> Dictionary:
 
 	var full_path: String = "%s/%s" % [parent.get_path(), new_name] if parent != null else new_name
 
-	return {
-		"content": [{"type": "text", "text": "Duplicated node: %s" % full_path}],
-		"isError": false,
-		"data": {"original_path": path, "duplicate_path": full_path, "name": new_name}
-	}
+	return MCPToolRegistry.create_response("Duplicated node: %s" % full_path, {
+		"original_path": path,
+		"duplicate_path": full_path,
+		"name": new_name
+	})
 
 
 func _execute_pack_as_scene(args: Dictionary) -> Dictionary:
@@ -431,16 +481,12 @@ func _execute_pack_as_scene(args: Dictionary) -> Dictionary:
 	# Free the original node
 	node.queue_free()
 
-	return {
-		"content": [{"type": "text", "text": "Packed node as scene: %s" % destination}],
-		"isError": false,
-		"data": {
-			"source_path": path,
-			"destination": destination,
-			"saved": true,
-			"instance_path": str(instance.get_path())
-		}
-	}
+	return MCPToolRegistry.create_response("Packed node as scene: %s" % destination, {
+		"source_path": path,
+		"destination": destination,
+		"saved": true,
+		"instance_path": str(instance.get_path())
+	})
 
 
 func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
@@ -587,12 +633,15 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 	return value
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

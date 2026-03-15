@@ -19,6 +19,8 @@
 extends RefCounted
 class_name EditorRestartTool
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 var _editor_interface: EditorInterface
 
 
@@ -49,19 +51,18 @@ func _execute_restart(_args: Dictionary) -> Dictionary:
 	# This ensures the response is sent before the editor shuts down
 	_editor_interface.call_deferred("restart_editor")
 
-	return {
-		"content": [{"type": "text", "text": "Editor restart initiated. The MCP connection will be terminated."}],
-		"isError": false,
-		"data": {}
-	}
+	return MCPToolRegistry.create_response("Editor restart initiated. The MCP connection will be terminated.")
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

@@ -3,6 +3,8 @@
 extends RefCounted
 class_name EditorViewportTools
 
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
+
 # Zoom factor constraints
 const ZOOM_MIN := 0.01
 const ZOOM_MAX := 100.0
@@ -27,7 +29,17 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 	registry.register_tool(
 		_create_tool_def("viewport_focus_on_node", "Focus the editor viewport camera on a specific scene node, centering it in the view", {
 			"path": {"type": "string", "description": "Node path to focus on (e.g., 'Main/Player' or '/root/Main/Player')"}
-		}, ["path"]),
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether focus succeeded"},
+				"node_path": {"type": "string", "description": "Path of the focused node"},
+				"node_name": {"type": "string", "description": "Name of the focused node"},
+				"focus_position": {"type": "object", "description": "3D position of the focus point"},
+				"camera_position": {"type": "object", "description": "3D position of the camera"},
+				"distance": {"type": "number", "description": "Distance from camera to focus point"}
+			}
+		}),
 		tools._execute_focus
 	)
 
@@ -43,7 +55,15 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 				"description": "Point the camera should look at in world coordinates",
 				"properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
 			}
-		}, ["position", "look_at"]),
+		}, ["position", "look_at"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether positioning succeeded"},
+				"camera_position": {"type": "object", "description": "3D camera position"},
+				"look_at": {"type": "object", "description": "3D look-at target position"},
+				"distance": {"type": "number", "description": "Distance from camera to look-at point"}
+			}
+		}),
 		tools._execute_set_camera
 	)
 
@@ -58,7 +78,15 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 					"z": {"type": "number", "default": 0, "description": "Roll rotation in degrees"}
 				}
 			}
-		}, ["delta_rotation"]),
+		}, ["delta_rotation"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether orbit succeeded"},
+				"focus_point": {"type": "object", "description": "3D focus point position"},
+				"camera_position": {"type": "object", "description": "3D camera position after orbit"},
+				"rotation_applied": {"type": "object", "description": "Rotation angles applied in degrees"}
+			}
+		}),
 		tools._execute_orbit
 	)
 
@@ -70,7 +98,16 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 				"minimum": ZOOM_MIN,
 				"maximum": ZOOM_MAX
 			}
-		}, ["factor"]),
+		}, ["factor"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether zoom succeeded"},
+				"focus_point": {"type": "object", "description": "3D focus point position"},
+				"previous_distance": {"type": "number", "description": "Distance before zoom"},
+				"new_distance": {"type": "number", "description": "Distance after zoom"},
+				"zoom_factor": {"type": "number", "description": "Zoom factor applied"}
+			}
+		}),
 		tools._execute_zoom
 	)
 
@@ -212,18 +249,14 @@ func _execute_focus(args: Dictionary) -> Dictionary:
 	_focus_point = target_position
 	_focus_node_path = path
 
-	return {
-		"content": [{"type": "text", "text": "Camera focused on node '%s' at position (%.2f, %.2f, %.2f)" % [path, target_position.x, target_position.y, target_position.z]}],
-		"isError": false,
-		"data": {
-			"success": true,
-			"node_path": path,
-			"node_name": node.name,
-			"focus_position": {"x": target_position.x, "y": target_position.y, "z": target_position.z},
-			"camera_position": {"x": new_camera_position.x, "y": new_camera_position.y, "z": new_camera_position.z},
-			"distance": distance
-		}
-	}
+	return MCPToolRegistry.create_response("Camera focused on node '%s' at position (%.2f, %.2f, %.2f)" % [path, target_position.x, target_position.y, target_position.z], {
+		"success": true,
+		"node_path": path,
+		"node_name": node.name,
+		"focus_position": {"x": target_position.x, "y": target_position.y, "z": target_position.z},
+		"camera_position": {"x": new_camera_position.x, "y": new_camera_position.y, "z": new_camera_position.z},
+		"distance": distance
+	})
 
 
 func _execute_set_camera(args: Dictionary) -> Dictionary:
@@ -258,16 +291,12 @@ func _execute_set_camera(args: Dictionary) -> Dictionary:
 
 	var distance: float = position.distance_to(look_at)
 
-	return {
-		"content": [{"type": "text", "text": "Camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)" % [position.x, position.y, position.z, look_at.x, look_at.y, look_at.z]}],
-		"isError": false,
-		"data": {
-			"success": true,
-			"camera_position": {"x": position.x, "y": position.y, "z": position.z},
-			"look_at": {"x": look_at.x, "y": look_at.y, "z": look_at.z},
-			"distance": distance
-		}
-	}
+	return MCPToolRegistry.create_response("Camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)" % [position.x, position.y, position.z, look_at.x, look_at.y, look_at.z], {
+		"success": true,
+		"camera_position": {"x": position.x, "y": position.y, "z": position.z},
+		"look_at": {"x": look_at.x, "y": look_at.y, "z": look_at.z},
+		"distance": distance
+	})
 
 
 func _execute_zoom(args: Dictionary) -> Dictionary:
@@ -299,17 +328,13 @@ func _execute_zoom(args: Dictionary) -> Dictionary:
 	# Position the camera
 	camera.look_at_from_position(new_position, _focus_point, Vector3.UP)
 
-	return {
-		"content": [{"type": "text", "text": "Camera zoomed by factor %.2f (distance: %.2f -> %.2f)" % [factor, current_distance, new_distance]}],
-		"isError": false,
-		"data": {
-			"success": true,
-			"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
-			"previous_distance": current_distance,
-			"new_distance": new_distance,
-			"zoom_factor": factor
-		}
-	}
+	return MCPToolRegistry.create_response("Camera zoomed by factor %.2f (distance: %.2f -> %.2f)" % [factor, current_distance, new_distance], {
+		"success": true,
+		"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
+		"previous_distance": current_distance,
+		"new_distance": new_distance,
+		"zoom_factor": factor
+	})
 
 
 func _execute_orbit(args: Dictionary) -> Dictionary:
@@ -364,24 +389,23 @@ func _execute_orbit(args: Dictionary) -> Dictionary:
 	# Position the camera
 	camera.look_at_from_position(new_position, _focus_point, up_vector)
 
-	return {
-		"content": [{"type": "text", "text": "Camera orbited by (%.1f, %.1f, %.1f) degrees" % [rad_to_deg(pitch), rad_to_deg(yaw), rad_to_deg(roll)]}],
-		"isError": false,
-		"data": {
-			"success": true,
-			"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
-			"camera_position": {"x": new_position.x, "y": new_position.y, "z": new_position.z},
-			"rotation_applied": {"x": rad_to_deg(pitch), "y": rad_to_deg(yaw), "z": rad_to_deg(roll)}
-		}
-	}
+	return MCPToolRegistry.create_response("Camera orbited by (%.1f, %.1f, %.1f) degrees" % [rad_to_deg(pitch), rad_to_deg(yaw), rad_to_deg(roll)], {
+		"success": true,
+		"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
+		"camera_position": {"x": new_position.x, "y": new_position.y, "z": new_position.z},
+		"rotation_applied": {"x": rad_to_deg(pitch), "y": rad_to_deg(yaw), "z": rad_to_deg(roll)}
+	})
 
 
-static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
 	var schema: Dictionary = {"type": "object", "properties": props}
 	if not required.is_empty():
 		schema["required"] = required
-	return {
+	var tool_def: Dictionary = {
 		"name": name,
 		"description": desc,
 		"inputSchema": schema
 	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def
