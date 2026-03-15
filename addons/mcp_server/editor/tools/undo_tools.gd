@@ -3,59 +3,47 @@
 extends RefCounted
 class_name UndoTools
 
-const TOOL_UNDO := "editor_undo"
-const TOOL_REDO := "editor_redo"
-
 var _editor_interface: EditorInterface
-var _logger: MCPLogger
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("UndoTools") if logger else MCPLogger.new("[UndoTools]")
+func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 
 
-## Registers all undo tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_undo_tool())
-	registry.register(_create_redo_tool())
+## Registers all undo tools with the registry
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted, editor_interface: EditorInterface) -> RefCounted:
+	var tools := UndoTools.new(editor_interface)
 
+	registry.register_tool(
+		_create_tool_def("editor_undo", "Undoes the last action", {
+			"steps": {"type": "integer", "default": 1, "minimum": 1, "description": "Number of steps to undo"}
+		}, []),
+		tools._execute_undo
+	)
 
-func _create_undo_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_UNDO,
-			"Undoes the last action",
-			{
-				"steps": {"type": "integer", "default": 1, "minimum": 1, "description": "Number of steps to undo"}
-			},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_undo)
+	registry.register_tool(
+		_create_tool_def("editor_redo", "Redoes the last undone action", {
+			"steps": {"type": "integer", "default": 1, "minimum": 1, "description": "Number of steps to redo"}
+		}, []),
+		tools._execute_redo
+	)
 
-
-func _create_redo_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_REDO,
-			"Redoes the last undone action",
-			{
-				"steps": {"type": "integer", "default": 1, "minimum": 1, "description": "Number of steps to redo"}
-			},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_redo)
+	return tools
 
 
 # --- Tool Implementations ---
 
-func _execute_undo(params: Dictionary) -> MCPToolResult:
+func _execute_undo(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
-	var steps: int = params.get("steps", 1)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
+
+	var steps: int = args.get("steps", 1)
 	steps = maxi(1, steps)  # Ensure at least 1
 
 	var undo_redo: EditorUndoRedoManager = _editor_interface.get_undo_redo()
 	if undo_redo == null:
-		return MCPToolResult.error("Undo/Redo manager not available", MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Undo/Redo manager not available"}], "isError": true}
 
 	var actual_steps: int = 0
 	for i: int in range(steps):
@@ -64,22 +52,23 @@ func _execute_undo(params: Dictionary) -> MCPToolResult:
 		undo_redo.undo()
 		actual_steps += 1
 
-	_logger.info("Undo performed", {"requested": steps, "actual": actual_steps})
-	return MCPToolResult.text("Undid %d action(s)" % actual_steps, {
-		"steps": actual_steps,
-		"has_more": undo_redo.has_undo()
-	})
+	return {
+		"content": [{"type": "text", "text": "Undid %d action(s)" % actual_steps}],
+		"isError": false,
+		"data": {"steps": actual_steps, "has_more": undo_redo.has_undo()}
+	}
 
 
-func _execute_redo(params: Dictionary) -> MCPToolResult:
+func _execute_redo(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
-	var steps: int = params.get("steps", 1)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
+
+	var steps: int = args.get("steps", 1)
 	steps = maxi(1, steps)  # Ensure at least 1
 
 	var undo_redo: EditorUndoRedoManager = _editor_interface.get_undo_redo()
 	if undo_redo == null:
-		return MCPToolResult.error("Undo/Redo manager not available", MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Undo/Redo manager not available"}], "isError": true}
 
 	var actual_steps: int = 0
 	for i: int in range(steps):
@@ -88,8 +77,19 @@ func _execute_redo(params: Dictionary) -> MCPToolResult:
 		undo_redo.redo()
 		actual_steps += 1
 
-	_logger.info("Redo performed", {"requested": steps, "actual": actual_steps})
-	return MCPToolResult.text("Redid %d action(s)" % actual_steps, {
-		"steps": actual_steps,
-		"has_more": undo_redo.has_redo()
-	})
+	return {
+		"content": [{"type": "text", "text": "Redid %d action(s)" % actual_steps}],
+		"isError": false,
+		"data": {"steps": actual_steps, "has_more": undo_redo.has_redo()}
+	}
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	return {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}

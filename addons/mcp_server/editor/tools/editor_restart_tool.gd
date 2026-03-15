@@ -19,42 +19,49 @@
 extends RefCounted
 class_name EditorRestartTool
 
-const TOOL_RESTART := "editor_restart"
-
 var _editor_interface: EditorInterface
-var _logger: MCPLogger
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("EditorRestartTool") if logger else MCPLogger.new("[EditorRestartTool]")
+func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 
 
-## Registers all editor restart tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_restart_tool())
+## Registers all editor restart tools with the registry
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted, editor_interface: EditorInterface) -> RefCounted:
+	var tools := EditorRestartTool.new(editor_interface)
 
-
-func _create_restart_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_RESTART,
-		"Restarts the Godot editor. The response is returned before the restart begins.",
-		{},  # No input parameters
-		[]
+	registry.register_tool(
+		_create_tool_def("editor_restart", "Restarts the Godot editor. The response is returned before the restart begins.", {}, []),
+		tools._execute_restart
 	)
-	return MCPToolHandler.new(definition, _execute_restart)
+
+	return tools
 
 
 # --- Tool Implementations ---
 
-func _execute_restart(_params: Dictionary = {}) -> MCPToolResult:
+func _execute_restart(_args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
 	# Schedule restart AFTER this frame completes
 	# This ensures the response is sent before the editor shuts down
 	_editor_interface.call_deferred("restart_editor")
 
-	_logger.info("Editor restart initiated")
+	return {
+		"content": [{"type": "text", "text": "Editor restart initiated. The MCP connection will be terminated."}],
+		"isError": false,
+		"data": {}
+	}
 
-	return MCPToolResult.text("Editor restart initiated. The MCP connection will be terminated.")
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	return {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}

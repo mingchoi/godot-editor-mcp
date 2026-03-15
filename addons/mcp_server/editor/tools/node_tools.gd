@@ -3,168 +3,86 @@
 extends RefCounted
 class_name NodeTools
 
-const TOOL_GET := "node_get"
-const TOOL_GET_PROPERTY := "node_get_property"
-const TOOL_SET_PROPERTY := "node_set_property"
-const TOOL_CREATE := "node_create"
-const TOOL_DELETE := "node_delete"
-const TOOL_LIST_CHILDREN := "node_list_children"
-const TOOL_DUPLICATE := "node_duplicate"
-const TOOL_PACK_AS_SCENE := "node_pack_as_scene"
-
 var _editor_interface: EditorInterface
-var _logger: MCPLogger
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("NodeTools") if logger else MCPLogger.new("[NodeTools]")
+func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 
 
-## Registers all node tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_get_tool())
-	registry.register(_create_get_property_tool())
-	registry.register(_create_set_property_tool())
-	registry.register(_create_create_tool())
-	registry.register(_create_delete_tool())
-	registry.register(_create_list_children_tool())
-	registry.register(_create_duplicate_tool())
-	registry.register(_create_pack_as_scene_tool())
+## Registers all node tools with the registry
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted, editor_interface: EditorInterface) -> RefCounted:
+	var tools := NodeTools.new(editor_interface)
 
-
-func _create_get_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_GET,
-			"Gets detailed information about a node",
-			{
-				"path": {
-					"type": "string",
-					"description": "Node path (e.g., 'Main/Player' or '/root/Main/Player')"
-				},
-				"include_properties": {
-					"type": "boolean",
-					"default": false,
-					"description": "Include all property values"
-				},
-				"include_children": {
-					"type": "boolean",
-					"default": false,
-					"description": "Include list of child node names"
-				}
-			},
-			["path"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_get(params)
+	registry.register_tool(
+		_create_tool_def("node_get", "Gets detailed information about a node", {
+			"path": {"type": "string", "description": "Node path (e.g., 'Main/Player' or '/root/Main/Player')"},
+			"include_properties": {"type": "boolean", "default": false, "description": "Include all property values"},
+			"include_children": {"type": "boolean", "default": false, "description": "Include list of child node names"}
+		}, ["path"]),
+		tools._execute_get
 	)
 
-
-func _create_get_property_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_GET_PROPERTY,
-			"Gets a specific property value from a node",
-			{
-				"path": {"type": "string", "description": "Node path"},
-				"property": {"type": "string", "description": "Property name"}
-			},
-			["path", "property"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_get_property(params)
+	registry.register_tool(
+		_create_tool_def("node_get_property", "Gets a specific property value from a node", {
+			"path": {"type": "string", "description": "Node path"},
+			"property": {"type": "string", "description": "Property name"}
+		}, ["path", "property"]),
+		tools._execute_get_property
 	)
 
-
-func _create_set_property_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_SET_PROPERTY,
-			"Sets a property value on a node",
-			{
-				"path": {"type": "string", "description": "Node path"},
-				"property": {"type": "string", "description": "Property name"},
-				"value": {"description": "New property value"}
-			},
-			["path", "property", "value"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_set_property(params)
+	registry.register_tool(
+		_create_tool_def("node_set_property", "Sets a property value on a node", {
+			"path": {"type": "string", "description": "Node path"},
+			"property": {"type": "string", "description": "Property name"},
+			"value": {"description": "New property value"}
+		}, ["path", "property", "value"]),
+		tools._execute_set_property
 	)
 
-
-func _create_create_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_CREATE,
-			"Creates a new node",
-			{
-				"type": {"type": "string", "description": "Node type (e.g., 'Sprite2D', 'Node2D')"},
-				"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
-				"parent": {"type": "string", "description": "Parent node path"},
-				"properties": {"type": "object", "default": {}, "description": "Initial property values"}
-			},
-			["type", "parent"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_create(params)
+	registry.register_tool(
+		_create_tool_def("node_create", "Creates a new node", {
+			"type": {"type": "string", "description": "Node type (e.g., 'Sprite2D', 'Node2D')"},
+			"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
+			"parent": {"type": "string", "description": "Parent node path"},
+			"properties": {"type": "object", "default": {}, "description": "Initial property values"}
+		}, ["type", "parent"]),
+		tools._execute_create
 	)
 
-
-func _create_delete_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_DELETE,
-			"Deletes a node",
-			{
-				"path": {"type": "string", "description": "Node path to delete"}
-			},
-			["path"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_delete(params)
+	registry.register_tool(
+		_create_tool_def("node_delete", "Deletes a node", {
+			"path": {"type": "string", "description": "Node path to delete"}
+		}, ["path"]),
+		tools._execute_delete
 	)
 
-
-func _create_list_children_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_LIST_CHILDREN,
-			"Lists all children of a node",
-			{
-				"path": {"type": "string", "description": "Parent node path"},
-				"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
-			},
-			["path"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_list_children(params)
+	registry.register_tool(
+		_create_tool_def("node_list_children", "Lists all children of a node", {
+			"path": {"type": "string", "description": "Parent node path"},
+			"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
+		}, ["path"]),
+		tools._execute_list_children
 	)
 
-
-func _create_duplicate_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_DUPLICATE,
-			"Duplicates a node",
-			{
-				"path": {"type": "string", "description": "Node to duplicate"},
-				"new_name": {"type": "string", "description": "Name for the duplicate"}
-			},
-			["path"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_duplicate(params)
+	registry.register_tool(
+		_create_tool_def("node_duplicate", "Duplicates a node", {
+			"path": {"type": "string", "description": "Node to duplicate"},
+			"new_name": {"type": "string", "description": "Name for the duplicate"}
+		}, ["path"]),
+		tools._execute_duplicate
 	)
 
-
-func _create_pack_as_scene_tool() -> MCPToolHandler:
-	return MCPToolHandler.new(
-		MCPToolDefinition.create(
-			TOOL_PACK_AS_SCENE,
-			"Saves a node branch as a new scene file and converts the node to an instance",
-			{
-				"path": {"type": "string", "description": "Source node path to pack"},
-				"destination": {"type": "string", "description": "Destination file path (e.g., 'res://scenes/new.tscn')"}
-			},
-			["path", "destination"]
-		),
-		func(params: Dictionary) -> MCPToolResult: return _execute_pack_as_scene(params)
+	registry.register_tool(
+		_create_tool_def("node_pack_as_scene", "Saves a node branch as a new scene file and converts the node to an instance", {
+			"path": {"type": "string", "description": "Source node path to pack"},
+			"destination": {"type": "string", "description": "Destination file path (e.g., 'res://scenes/new.tscn')"}
+		}, ["path", "destination"]),
+		tools._execute_pack_as_scene
 	)
+
+	return tools
 
 
 # --- Tool Implementations ---
@@ -187,17 +105,17 @@ func _resolve_node(path: String) -> Node:
 	return root.get_node_or_null(path)
 
 
-func _execute_get(params: Dictionary) -> MCPToolResult:
+func _execute_get(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var path: String = params.get("path", "")
-	var include_properties: bool = params.get("include_properties", false)
-	var include_children: bool = params.get("include_children", false)
+	var path: String = args.get("path", "")
+	var include_properties: bool = args.get("include_properties", false)
+	var include_children: bool = args.get("include_children", false)
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	var data: Dictionary = {
 		"path": path,
@@ -215,22 +133,26 @@ func _execute_get(params: Dictionary) -> MCPToolResult:
 			children.append(child.name)
 		data["children"] = children
 
-	return MCPToolResult.text("Node: %s (%s)" % [node.name, node.get_class()], data)
+	return {
+		"content": [{"type": "text", "text": "Node: %s (%s)" % [node.name, node.get_class()]}],
+		"isError": false,
+		"data": data
+	}
 
 
-func _execute_get_property(params: Dictionary) -> MCPToolResult:
+func _execute_get_property(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var path: String = params.get("path", "")
-	var property: String = params.get("property", "")
+	var path: String = args.get("path", "")
+	var property: String = args.get("property", "")
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	if not property in node:
-		return MCPToolResult.error("Property not found: %s" % property, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Property not found: %s" % property}], "isError": true}
 
 	var value: Variant = node.get(property)
 	var value_type: String = type_string(typeof(value))
@@ -242,16 +164,20 @@ func _execute_get_property(params: Dictionary) -> MCPToolResult:
 		"type": value_type
 	}
 
-	return MCPToolResult.text("%s: %s" % [property, str(value)], data)
+	return {
+		"content": [{"type": "text", "text": "%s: %s" % [property, str(value)]}],
+		"isError": false,
+		"data": data
+	}
 
 
-func _execute_set_property(params: Dictionary) -> MCPToolResult:
+func _execute_set_property(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var path: String = params.get("path", "")
-	var property: String = params.get("property", "")
-	var raw_value: Variant = params.get("value")
+	var path: String = args.get("path", "")
+	var property: String = args.get("property", "")
+	var raw_value: Variant = args.get("value")
 
 	# Parse JSON string if necessary (MCP may send objects as JSON strings)
 	if typeof(raw_value) == TYPE_STRING:
@@ -261,7 +187,7 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	# Get the expected type and convert the value
 	var property_list: Array = node.get_property_list()
@@ -269,49 +195,46 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 	for prop: Dictionary in property_list:
 		if prop["name"] == property:
 			expected_type = prop["type"]
-			_logger.info("Found property type", {"property": property, "type": expected_type, "type_name": type_string(expected_type)})
 			break
 
-	if expected_type == TYPE_NIL:
-		_logger.warning("Property type not found in list", {"property": property})
-
 	var value: Variant = _json_to_variant(raw_value, expected_type)
-	_logger.info("Value conversion", {"raw_type": type_string(typeof(raw_value)), "converted_type": type_string(typeof(value))})
 	var old_value: Variant = node.get(property)
 	node.set(property, value)
 
-	_logger.info("Property set", {"path": path, "property": property, "old": old_value, "new": value})
+	return {
+		"content": [{"type": "text", "text": "Set %s = %s" % [property, str(value)]}],
+		"isError": false,
+		"data": {
+			"path": path,
+			"property": property,
+			"old_value": _variant_to_json(old_value),
+			"new_value": _variant_to_json(value)
+		}
+	}
 
-	return MCPToolResult.text("Set %s = %s" % [property, str(value)], {
-		"path": path,
-		"property": property,
-		"old_value": _variant_to_json(old_value),
-		"new_value": _variant_to_json(value)
-	})
 
-
-func _execute_create(params: Dictionary) -> MCPToolResult:
+func _execute_create(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var node_type: String = params.get("type", "")
-	var node_name: String = params.get("name", "")
-	var parent_path: String = params.get("parent", "")
-	var properties: Dictionary = params.get("properties", {})
+	var node_type: String = args.get("type", "")
+	var node_name: String = args.get("name", "")
+	var parent_path: String = args.get("parent", "")
+	var properties: Dictionary = args.get("properties", {})
 
 	# Validate type
 	if not ClassDB.class_exists(node_type):
-		return MCPToolResult.error("Unknown node type: %s" % node_type, MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Unknown node type: %s" % node_type}], "isError": true}
 
 	# Get parent
 	var parent: Node = _resolve_node(parent_path)
 	if parent == null:
-		return MCPToolResult.error("Parent node not found: %s" % parent_path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Parent node not found: %s" % parent_path}], "isError": true}
 
 	# Create node
 	var new_node: Node = ClassDB.instantiate(node_type)
 	if new_node == null:
-		return MCPToolResult.error("Failed to create node of type: %s" % node_type, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to create node of type: %s" % node_type}], "isError": true}
 
 	# Set name
 	if node_name.is_empty():
@@ -327,24 +250,23 @@ func _execute_create(params: Dictionary) -> MCPToolResult:
 	new_node.owner = _editor_interface.get_edited_scene_root()
 
 	var full_path: String = "%s/%s" % [parent_path, new_node.name]
-	_logger.info("Node created", {"path": full_path, "type": node_type})
 
-	return MCPToolResult.text("Created node: %s" % full_path, {
-		"path": full_path,
-		"name": new_node.name,
-		"type": node_type
-	})
+	return {
+		"content": [{"type": "text", "text": "Created node: %s" % full_path}],
+		"isError": false,
+		"data": {"path": full_path, "name": new_node.name, "type": node_type}
+	}
 
 
-func _execute_delete(params: Dictionary) -> MCPToolResult:
+func _execute_delete(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var path: String = params.get("path", "")
+	var path: String = args.get("path", "")
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	var node_name: String = node.name
 	var parent: Node = node.get_parent()
@@ -354,44 +276,47 @@ func _execute_delete(params: Dictionary) -> MCPToolResult:
 
 	node.queue_free()
 
-	_logger.info("Node deleted", {"path": path})
-	return MCPToolResult.text("Deleted node: %s" % path, {"path": path, "name": node_name})
+	return {
+		"content": [{"type": "text", "text": "Deleted node: %s" % path}],
+		"isError": false,
+		"data": {"path": path, "name": node_name}
+	}
 
 
-func _execute_list_children(params: Dictionary) -> MCPToolResult:
+func _execute_list_children(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var path: String = params.get("path", "")
-	var recursive: bool = params.get("recursive", false)
+	var path: String = args.get("path", "")
+	var recursive: bool = args.get("recursive", false)
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	var children: Array[Dictionary] = _get_children_list(node, recursive)
 
-	return MCPToolResult.text("Found %d children" % children.size(), {
-		"path": path,
-		"children": children,
-		"count": children.size()
-	})
+	return {
+		"content": [{"type": "text", "text": "Found %d children" % children.size()}],
+		"isError": false,
+		"data": {"path": path, "children": children, "count": children.size()}
+	}
 
 
-func _execute_duplicate(params: Dictionary) -> MCPToolResult:
+func _execute_duplicate(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var path: String = params.get("path", "")
-	var new_name: String = params.get("new_name", "")
+	var path: String = args.get("path", "")
+	var new_name: String = args.get("new_name", "")
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	var duplicate: Node = node.duplicate()
 	if duplicate == null:
-		return MCPToolResult.error("Failed to duplicate node", MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to duplicate node"}], "isError": true}
 
 	if new_name.is_empty():
 		new_name = node.name + "_duplicate"
@@ -404,36 +329,35 @@ func _execute_duplicate(params: Dictionary) -> MCPToolResult:
 
 	var full_path: String = "%s/%s" % [parent.get_path(), new_name] if parent != null else new_name
 
-	_logger.info("Node duplicated", {"original": path, "duplicate": full_path})
-	return MCPToolResult.text("Duplicated node: %s" % full_path, {
-		"original_path": path,
-		"duplicate_path": full_path,
-		"name": new_name
-	})
+	return {
+		"content": [{"type": "text", "text": "Duplicated node: %s" % full_path}],
+		"isError": false,
+		"data": {"original_path": path, "duplicate_path": full_path, "name": new_name}
+	}
 
 
-func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
+func _execute_pack_as_scene(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
-	var path: String = params.get("path", "")
-	var destination: String = params.get("destination", "")
+	var path: String = args.get("path", "")
+	var destination: String = args.get("destination", "")
 
 	# Validate destination path
 	if not destination.begins_with("res://"):
-		return MCPToolResult.error("Destination must be a res:// path", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Destination must be a res:// path"}], "isError": true}
 
 	if not destination.ends_with(".tscn") and not destination.ends_with(".scn"):
-		return MCPToolResult.error("Destination must have .tscn or .scn extension", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Destination must have .tscn or .scn extension"}], "isError": true}
 
 	# Get the node to pack
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	var parent: Node = node.get_parent()
 	if parent == null:
-		return MCPToolResult.error("Cannot pack root node (no parent)", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Cannot pack root node (no parent)"}], "isError": true}
 
 	var node_index: int = node.get_index()
 	var node_name: String = node.name
@@ -453,7 +377,7 @@ func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
 	# Duplicate the node for packing (keep original in scene tree)
 	var duplicate: Node = node.duplicate(Node.DUPLICATE_SIGNALS | Node.DUPLICATE_GROUPS | Node.DUPLICATE_SCRIPTS)
 	if duplicate == null:
-		return MCPToolResult.error("Failed to duplicate node", MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to duplicate node"}], "isError": true}
 
 	# Reset transform on duplicate to avoid "root node transform" warning
 	if is_node3d:
@@ -472,12 +396,12 @@ func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
 	duplicate.queue_free()
 
 	if pack_result != OK:
-		return MCPToolResult.error("Failed to pack node: %s" % path, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to pack node: %s" % path}], "isError": true}
 
 	# Save the packed scene
 	var save_result: int = ResourceSaver.save(packed, destination)
 	if save_result != OK:
-		return MCPToolResult.error("Failed to save scene to: %s" % destination, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to save scene to: %s" % destination}], "isError": true}
 
 	# Update the filesystem so the new scene is recognized
 	var fs: EditorFileSystem = _editor_interface.get_resource_filesystem()
@@ -486,7 +410,7 @@ func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
 	# Load the saved scene from disk so the instance gets scene_file_path set
 	var loaded_scene: PackedScene = ResourceLoader.load(destination)
 	if loaded_scene == null:
-		return MCPToolResult.error("Failed to load saved scene: %s" % destination, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to load saved scene: %s" % destination}], "isError": true}
 
 	# Create an instance from the loaded scene
 	var instance: Node = loaded_scene.instantiate()
@@ -507,14 +431,16 @@ func _execute_pack_as_scene(params: Dictionary) -> MCPToolResult:
 	# Free the original node
 	node.queue_free()
 
-	_logger.info("Node packed as scene and replaced with instance", {"source": path, "destination": destination})
-
-	return MCPToolResult.text("Packed node as scene: %s" % destination, {
-		"source_path": path,
-		"destination": destination,
-		"saved": true,
-		"instance_path": str(instance.get_path())
-	})
+	return {
+		"content": [{"type": "text", "text": "Packed node as scene: %s" % destination}],
+		"isError": false,
+		"data": {
+			"source_path": path,
+			"destination": destination,
+			"saved": true,
+			"instance_path": str(instance.get_path())
+		}
+	}
 
 
 func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
@@ -531,13 +457,6 @@ func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
 			result.append_array(_get_children_list(child, true))
 
 	return result
-
-
-## Recursively clears owner on node and all descendants
-func _clear_ownership(node: Node) -> void:
-	node.owner = null
-	for child: Node in node.get_children():
-		_clear_ownership(child)
 
 
 ## Recursively sets owner on all descendants (not the node itself)
@@ -666,3 +585,14 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 			return arr
 
 	return value
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	return {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}

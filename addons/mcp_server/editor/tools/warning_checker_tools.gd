@@ -3,24 +3,38 @@
 extends RefCounted
 class_name WarningCheckerTools
 
-const TOOL_GET_NODE_WARNINGS := "editor_get_node_warnings"
-const TOOL_GET_SCENE_WARNINGS := "editor_get_scene_warnings"
-const TOOL_GET_WARNING_TYPES := "editor_get_warning_types"
-
 var _editor_interface: EditorInterface
-var _logger: MCPLogger
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("WarningCheckerTools") if logger else MCPLogger.new("[WarningCheckerTools]")
+func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 
 
-## Registers all warning checker tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_get_node_warnings_tool())
-	registry.register(_create_get_scene_warnings_tool())
-	registry.register(_create_get_warning_types_tool())
+## Registers all warning checker tools with the registry
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted, editor_interface: EditorInterface) -> RefCounted:
+	var tools := WarningCheckerTools.new(editor_interface)
+
+	registry.register_tool(
+		_create_tool_def("editor_get_node_warnings", "Gets configuration warnings for a specific node in the current scene. Returns warnings that Godot would normally display in the editor for improperly configured nodes.", {
+			"path": {"type": "string", "description": "Node path in the scene tree. Can be absolute (/root/Main/Player) or relative (Main/Player)"}
+		}, ["path"]),
+		tools._execute_get_node_warnings
+	)
+
+	registry.register_tool(
+		_create_tool_def("editor_get_scene_warnings", "Gets configuration warnings for all nodes in the current scene. Returns a comprehensive list of warnings across the entire scene.", {}, []),
+		tools._execute_get_scene_warnings
+	)
+
+	registry.register_tool(
+		_create_tool_def("editor_get_warning_types", "Queries available configuration warning types for Godot node classes. Returns information about which node classes have configuration warnings.", {
+			"class_name": {"type": "string", "description": "Optional filter for a specific node class", "required": false}
+		}, []),
+		tools._execute_get_warning_types
+	)
+
+	return tools
 
 
 ## Gets warnings from a node by checking its properties using match-based hierarchy
@@ -436,124 +450,83 @@ func _check_warning(node_class: String, node: Node) -> PackedStringArray:
 	return warnings
 
 
-## Creates the editor_get_node_warnings tool
-func _create_get_node_warnings_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_GET_NODE_WARNINGS,
-		"Gets configuration warnings for a specific node in the current scene. Returns warnings that Godot would normally display in the editor for improperly configured nodes.",
-		{
-			"path": {
-				"type": "string",
-				"description": "Node path in the scene tree. Can be absolute (/root/Main/Player) or relative (Main/Player)"
-			}
-		},
-		["path"]
-	)
-	return MCPToolHandler.new(definition, _execute_get_node_warnings)
-
-
 ## Executes the editor_get_node_warnings tool
-func _execute_get_node_warnings(params: Dictionary) -> MCPToolResult:
+func _execute_get_node_warnings(args: Dictionary) -> Dictionary:
 	# Check editor interface availability
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
 	# Get scene root
 	var scene_root: Node = _editor_interface.get_edited_scene_root()
 	if scene_root == null:
-		return MCPToolResult.error("No scene is currently open in the editor", MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: No scene is currently open in the editor"}], "isError": true}
 
 	# Get and validate path parameter
-	var path: String = params.get("path", "")
+	var path: String = args.get("path", "")
 	if path.is_empty():
-		return MCPToolResult.error("Parameter 'path' is required", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Parameter 'path' is required"}], "isError": true}
 
 	# Resolve node
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: " + path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: " + path}], "isError": true}
 
 	# Get warnings using native method
 	var warnings: PackedStringArray = _get_node_warnings(node)
 
-	# Build result
-	var result := ConfigurationWarningResult.new(
-		str(node.get_path()),
-		node.name,
-		node.get_class(),
-		warnings
-	)
-
 	# Return appropriate message based on warnings
-	if result.has_warnings():
-		var warning_count: int = result.warnings.size()
-		var message := "Node %s has %d configuration warning(s):\n" % [result.node_name, warning_count]
-		for i in range(warning_count):
-			message += "  %d. %s\n" % [i + 1, result.warnings[i]]
-		return MCPToolResult.text(message, result.to_dict())
+	if warnings.is_empty():
+		return {
+			"content": [{"type": "text", "text": "Node %s has no configuration warnings" % node.name}],
+			"isError": false,
+			"data": {"path": path, "node_name": node.name, "class_name": node.get_class(), "warnings": []}
+		}
 	else:
-		return MCPToolResult.text("Node %s has no configuration warnings" % result.node_name, result.to_dict())
-
-
-## Creates the editor_get_scene_warnings tool
-func _create_get_scene_warnings_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_GET_SCENE_WARNINGS,
-		"Gets configuration warnings for all nodes in the current scene. Returns a comprehensive list of warnings across the entire scene.",
-		{},
-		[]
-	)
-	return MCPToolHandler.new(definition, _execute_get_scene_warnings)
-
-
-## Creates the editor_get_warning_types tool (placeholder for US3)
-func _create_get_warning_types_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_GET_WARNING_TYPES,
-		"Queries available configuration warning types for Godot node classes. Returns information about which node classes have configuration warnings.",
-		{
-			"class_name": {
-				"type": "string",
-				"description": "Optional filter for a specific node class",
-				"required": false
-			}
-		},
-		[]
-	)
-	return MCPToolHandler.new(definition, _execute_get_warning_types_placeholder)
+		var warning_count: int = warnings.size()
+		var message := "Node %s has %d configuration warning(s):\n" % [node.name, warning_count]
+		for i in range(warning_count):
+			message += "  %d. %s\n" % [i + 1, warnings[i]]
+		return {
+			"content": [{"type": "text", "text": message}],
+			"isError": false,
+			"data": {"path": path, "node_name": node.name, "class_name": node.get_class(), "warnings": warnings}
+		}
 
 
 ## Executes the editor_get_scene_warnings tool
-func _execute_get_scene_warnings(_params: Dictionary = {}) -> MCPToolResult:
+func _execute_get_scene_warnings(_args: Dictionary) -> Dictionary:
 	# Check editor interface availability
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
 
 	# Get scene root
 	var scene_root: Node = _editor_interface.get_edited_scene_root()
 	if scene_root == null:
-		return MCPToolResult.error("No scene is currently open in the editor", MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: No scene is currently open in the editor"}], "isError": true}
 
 	# Collect warnings from all nodes in the scene
 	var warnings: Array = []
 	var total_nodes: int = _collect_warnings_recursive(scene_root, warnings)
 
 	# Build response
-	var response := SceneWarningsResponse.new(warnings, total_nodes, warnings.size())
-
-	if response.nodes_with_warnings > 0:
-		var message := "Found %d configuration warning(s) across %d node(s) in scene:\n\n" % [response.nodes_with_warnings, response.total_nodes_checked]
+	if warnings.is_empty():
+		return {
+			"content": [{"type": "text", "text": "No configuration warnings found in scene (checked %d node(s))" % total_nodes}],
+			"isError": false,
+			"data": {"total_nodes_checked": total_nodes, "nodes_with_warnings": 0, "warnings": []}
+		}
+	else:
+		var message := "Found %d configuration warning(s) across %d node(s) in scene:\n\n" % [warnings.size(), total_nodes]
 		for warning_result in warnings:
-			message += "[%s] %s:\n" % [warning_result.godot_class_name, warning_result.path]
+			message += "[%s] %s:\n" % [warning_result.class_name, warning_result.path]
 			for w in warning_result.warnings:
 				message += "  - %s\n" % w
 			message += "\n"
-		return MCPToolResult.text(message, response.to_dict())
-	else:
-		return MCPToolResult.text(
-			"No configuration warnings found in scene (checked %d node(s))" % response.total_nodes_checked,
-			response.to_dict()
-		)
+		return {
+			"content": [{"type": "text", "text": message}],
+			"isError": false,
+			"data": {"total_nodes_checked": total_nodes, "nodes_with_warnings": warnings.size(), "warnings": warnings}
+		}
 
 
 ## Recursively collects warnings from all nodes in the scene tree
@@ -564,13 +537,12 @@ func _collect_warnings_recursive(node: Node, warnings: Array) -> int:
 	# Get warnings for this node
 	var node_warnings: PackedStringArray = _get_node_warnings(node)
 	if not node_warnings.is_empty():
-		var result := ConfigurationWarningResult.new(
-			str(node.get_path()),
-			node.name,
-			node.get_class(),
-			node_warnings
-		)
-		warnings.append(result)
+		warnings.append({
+			"path": str(node.get_path()),
+			"node_name": node.name,
+			"class_name": node.get_class(),
+			"warnings": node_warnings
+		})
 
 	# Recursively check children
 	for child in node.get_children():
@@ -579,9 +551,13 @@ func _collect_warnings_recursive(node: Node, warnings: Array) -> int:
 	return total_count
 
 
-## Placeholder execute method for warning types (US3 - not yet implemented)
-func _execute_get_warning_types_placeholder(_params: Dictionary = {}) -> MCPToolResult:
-	return MCPToolResult.error("Warning types tool not yet implemented - see User Story 3", MCPError.Code.INTERNAL_ERROR)
+## Executes the editor_get_warning_types tool (placeholder for future implementation)
+func _execute_get_warning_types(_args: Dictionary) -> Dictionary:
+	return {
+		"content": [{"type": "text", "text": "Warning types tool not yet implemented"}],
+		"isError": true,
+		"data": {}
+	}
 
 
 ## Resolves a node path from the editor context
@@ -602,3 +578,14 @@ func _resolve_node(path: String) -> Node:
 
 	# Handle relative paths from scene root
 	return scene_root.get_node_or_null(path)
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	return {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}

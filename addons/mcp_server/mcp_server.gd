@@ -1,13 +1,14 @@
-## Simple MCP WebSocket Server
-## Lightweight WebSocket-based MCP server implementation
-class_name SimpleMCPServer
+class_name MCPServer
 extends RefCounted
 
-const SimpleToolRegistryClass = preload("res://addons/mcp_server/simple_tool_registry.gd")
+## WebSocket-based MCP Server implementation with tool registry
+## Based on reference implementation from godot-plugin-test
+
+const ToolRegistryClass = preload("res://addons/mcp_server/tool_registry.gd")
 
 var _tcp_server: TCPServer
 var _peers: Dictionary = {}
-var _tool_registry: SimpleToolRegistry
+var _tool_registry: RefCounted
 var _port: int
 var _host: String
 
@@ -22,17 +23,15 @@ var _next_peer_id: int = 1
 func _init(port: int = 8765, host: String = "127.0.0.1") -> void:
 	_port = port
 	_host = host
-	_tool_registry = SimpleToolRegistryClass.new()
+	_tool_registry = ToolRegistryClass.new()
 
 
-## Start the WebSocket server
 func start() -> bool:
 	_tcp_server = TCPServer.new()
 	var err = _tcp_server.listen(_port, _host)
 	return err == OK
 
 
-## Stop the WebSocket server
 func stop() -> void:
 	if _tcp_server and _tcp_server.is_listening():
 		_tcp_server.stop()
@@ -44,7 +43,6 @@ func stop() -> void:
 	_peers.clear()
 
 
-## Poll for network activity (call from plugin _process)
 func poll() -> void:
 	if _tcp_server == null:
 		return
@@ -78,11 +76,10 @@ func is_running() -> bool:
 
 
 ## Get the tool registry for registering tools
-func get_tool_registry() -> SimpleToolRegistry:
+func get_tool_registry() -> RefCounted:
 	return _tool_registry
 
 
-## Setup a new WebSocket peer connection
 func _setup_websocket_peer(tcp: StreamPeerTCP) -> void:
 	var ws = WebSocketPeer.new()
 	var ws_id = _next_peer_id
@@ -96,7 +93,6 @@ func _setup_websocket_peer(tcp: StreamPeerTCP) -> void:
 	}
 
 
-## Process messages from a peer
 func _process_peer_messages(peer_id: int, ws: WebSocketPeer) -> void:
 	if _peers[peer_id]["state"] == "connecting":
 		_peers[peer_id]["state"] = "connected"
@@ -110,7 +106,6 @@ func _process_peer_messages(peer_id: int, ws: WebSocketPeer) -> void:
 		_handle_message(peer_id, text)
 
 
-## Handle an incoming JSON-RPC message
 func _handle_message(peer_id: int, message_text: String) -> void:
 	var json = JSON.new()
 	if json.parse(message_text) != OK:
@@ -139,7 +134,6 @@ func _handle_message(peer_id: int, message_text: String) -> void:
 			_send_error(peer_id, request_id, "Unknown method: %s" % method, -32601)
 
 
-## Handle initialize request
 func _handle_initialize(peer_id: int, request_id) -> void:
 	_send_message(peer_id, {
 		"jsonrpc": "2.0",
@@ -154,7 +148,6 @@ func _handle_initialize(peer_id: int, request_id) -> void:
 	})
 
 
-## Handle tools/list request
 func _handle_tools_list(peer_id: int, request_id) -> void:
 	_send_message(peer_id, {
 		"jsonrpc": "2.0",
@@ -165,7 +158,6 @@ func _handle_tools_list(peer_id: int, request_id) -> void:
 	})
 
 
-## Handle tools/call request
 func _handle_tools_call(peer_id: int, request_id, params: Dictionary) -> void:
 	var tool_name = params.get("name", "")
 	var arguments = params.get("arguments", {})
@@ -182,7 +174,6 @@ func _handle_tools_call(peer_id: int, request_id, params: Dictionary) -> void:
 	})
 
 
-## Send a message to a peer
 func _send_message(peer_id: int, data: Dictionary) -> void:
 	if not _peers.has(peer_id):
 		return
@@ -192,7 +183,6 @@ func _send_message(peer_id: int, data: Dictionary) -> void:
 	ws.send_text(JSON.stringify(data))
 
 
-## Send an error response
 func _send_error(peer_id: int, request_id, message: String, code: int = -32603) -> void:
 	_send_message(peer_id, {
 		"jsonrpc": "2.0",
