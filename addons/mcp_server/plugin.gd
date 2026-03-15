@@ -1,117 +1,76 @@
 @tool
-## MCP Server Plugin
-## Main EditorPlugin entry point for the MCP server.
-##
-## This plugin provides two MCP servers:
-## - Editor MCP Server (port 8765): Control the Godot editor
-## - Runtime MCP Server (port 8766): Interact with running games (debug only)
+## MCP WebSocket Server Plugin
+## Simple MCP server plugin for Godot Editor
 extends EditorPlugin
-class_name MCPPlugin
 
-const PLUGIN_NAME: String = "MCP Server"
-const PLUGIN_VERSION: String = "1.0.0"
+const MCPServerClass = preload("res://addons/mcp_server/mcp_server.gd")
 
-var _settings: MCPSettings
-var _editor_server: EditorMCPServer
-var _logger: MCPLogger
+# Import tool classes - each has a static register() function
+const SceneToolsClass = preload("res://addons/mcp_server/editor/tools/scene_tools.gd")
+const NodeToolsClass = preload("res://addons/mcp_server/editor/tools/node_tools.gd")
+const FileSystemToolsClass = preload("res://addons/mcp_server/editor/tools/filesystem_tools.gd")
+const SelectionToolsClass = preload("res://addons/mcp_server/editor/tools/selection_tools.gd")
+const ScriptToolsClass = preload("res://addons/mcp_server/editor/tools/script_tools.gd")
+const UndoToolsClass = preload("res://addons/mcp_server/editor/tools/undo_tools.gd")
+const EditorCaptureToolsClass = preload("res://addons/mcp_server/editor/tools/capture_tools.gd")
+const EditorViewportToolsClass = preload("res://addons/mcp_server/editor/tools/viewport_tools.gd")
+const EditorLogToolsClass = preload("res://addons/mcp_server/editor/tools/editor_log_tools.gd")
+const EditorRestartToolClass = preload("res://addons/mcp_server/editor/tools/editor_restart_tool.gd")
+const WarningCheckerToolsClass = preload("res://addons/mcp_server/editor/tools/warning_checker_tools.gd")
+
+var _mcp_server: MCPServer
+var _port: int = 8765
+var _editor_interface: EditorInterface
+
+# Keep references to tool objects to prevent garbage collection
+var _tool_objects: Array[RefCounted] = []
 
 
 func _enter_tree() -> void:
-	# Initialize logger
-	_logger = MCPLogger.new("[MCP]", MCPLogger.Level.INFO)
-	_logger.info("Plugin initializing", {"version": PLUGIN_VERSION})
+	_editor_interface = get_editor_interface()
+	_mcp_server = MCPServerClass.new(_port)
 
-	# Load settings
-	_settings = MCPSettings.load_or_create()
-	_apply_settings()
+	if _mcp_server.start():
+		print("[MCP Server] Started on port %d (ws://127.0.0.1:%d)" % [_port, _port])
+		_register_tools()
+	else:
+		push_error("[MCP Server] Failed to start on port %d" % _port)
 
-	# Start Editor MCP Server if enabled
-	if _settings.editor_mcp.enabled:
-		_start_editor_server()
-
-	_logger.info("Plugin ready")
+	# Register RuntimeMCP autoload for game runtime
+	add_autoload_singleton("RuntimeMCP", "res://addons/mcp_server/runtime/runtime_mcp_autoload.gd")
+	print("[MCP Server] Registered RuntimeMCP autoload singleton")
 
 
 func _exit_tree() -> void:
-	_logger.info("Plugin shutting down")
+	if _mcp_server:
+		_mcp_server.stop()
+	print("[MCP Server] Stopped")
 
-	# Stop Editor MCP Server
-	if _editor_server != null:
-		_editor_server.stop()
-		_editor_server.queue_free()
-		_editor_server = null
-
-	_logger.info("Plugin stopped")
+	# Remove RuntimeMCP autoload
+	remove_autoload_singleton("RuntimeMCP")
+	print("[MCP Server] Removed RuntimeMCP autoload singleton")
 
 
-## Gets the plugin settings
-func get_settings() -> MCPSettings:
-	return _settings
+func _process(_delta: float) -> void:
+	if _mcp_server:
+		_mcp_server.poll()
 
 
-## Saves the current settings
-func save_settings() -> Error:
-	if _settings == null:
-		return ERR_UNCONFIGURED
-	return _settings.save_to_file()
+func _register_tools() -> void:
+	var registry = _mcp_server.get_tool_registry()
 
+	# Register all tool categories using static register() functions
+	# Store returned instances to prevent garbage collection
+	_tool_objects.append(SceneToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(NodeToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(FileSystemToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(SelectionToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(ScriptToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(UndoToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(EditorCaptureToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(EditorViewportToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(EditorLogToolsClass.register(registry, _editor_interface))
+	_tool_objects.append(EditorRestartToolClass.register(registry, _editor_interface))
+	_tool_objects.append(WarningCheckerToolsClass.register(registry, _editor_interface))
 
-## Applies settings to running components
-func _apply_settings() -> void:
-	if _settings == null:
-		return
-
-	# Update log level
-	if _logger != null:
-		_logger.set_level(_settings.get_log_level_enum())
-
-
-## Starts the Editor MCP Server
-func _start_editor_server() -> void:
-	if _editor_server != null:
-		_logger.warning("Editor server already running")
-		return
-
-	_editor_server = EditorMCPServer.new(_settings.editor_mcp, _logger, get_editor_interface())
-	add_child(_editor_server)
-
-	var err: Error = _editor_server.start()
-	if err != OK:
-		_logger.error("Failed to start Editor MCP Server", {"error": err})
-		_editor_server.queue_free()
-		_editor_server = null
-	else:
-		_logger.info("Editor MCP Server started", {
-			"port": _settings.editor_mcp.port,
-			"host": _settings.editor_mcp.host
-		})
-
-
-## Stops the Editor MCP Server
-func _stop_editor_server() -> void:
-	if _editor_server == null:
-		return
-
-	_editor_server.stop()
-	_editor_server.queue_free()
-	_editor_server = null
-	_logger.info("Editor MCP Server stopped")
-
-
-## Restarts the Editor MCP Server with current settings
-func restart_editor_server() -> void:
-	_stop_editor_server()
-	if _settings.editor_mcp.enabled:
-		_start_editor_server()
-
-
-## Checks if the Editor MCP Server is running
-func is_editor_server_running() -> bool:
-	return _editor_server != null and _editor_server.is_running()
-
-
-## Gets the Editor MCP Server port
-func get_editor_server_port() -> int:
-	if _settings == null or _settings.editor_mcp == null:
-		return MCPConstants.DEFAULT_EDITOR_PORT
-	return _settings.editor_mcp.port
+	print("[MCP Server] Registered %d tools" % registry.size())

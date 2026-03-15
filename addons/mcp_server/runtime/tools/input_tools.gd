@@ -3,152 +3,92 @@
 extends RefCounted
 class_name InputTools
 
-const TOOL_KEY_PRESS := "input_key_press"
-const TOOL_KEY_TAP := "input_key_tap"
-const TOOL_KEY_RELEASE := "input_key_release"
-const TOOL_MOUSE_MOVE := "input_mouse_move"
-const TOOL_MOUSE_CLICK := "input_mouse_click"
-const TOOL_ACTION_PRESS := "input_action_press"
-const TOOL_ACTION_RELEASE := "input_action_release"
-const TOOL_TYPE_TEXT := "input_type_text"
-
-var _logger: MCPLogger
-var _editor_interface: EditorInterface
 var _held_keys: Dictionary = {}  # Key constant -> bool
 var _held_actions: Dictionary = {}  # Action name -> bool
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("InputTools") if logger else MCPLogger.new("[InputTools]")
-	_editor_interface = editor_interface
-
-
 ## Registers all input tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_key_press_tool())
-	registry.register(_create_key_tap_tool())
-	registry.register(_create_key_release_tool())
-	registry.register(_create_mouse_move_tool())
-	registry.register(_create_mouse_click_tool())
-	registry.register(_create_action_press_tool())
-	registry.register(_create_action_release_tool())
-	registry.register(_create_type_text_tool())
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted) -> RefCounted:
+	var tools := InputTools.new()
 
+	registry.register_tool(
+		_create_tool_def("runtime_input_key_press", "Simulates a key press and hold", {
+			"key": {"type": "string", "description": "Key name (e.g., 'KEY_A', 'KEY_SPACE', 'KEY_UP')"},
+			"shift": {"type": "boolean", "default": false},
+			"ctrl": {"type": "boolean", "default": false},
+			"alt": {"type": "boolean", "default": false},
+			"duration_ms": {"type": "integer", "default": 100, "description": "Press duration in milliseconds"}
+		}, ["key"]),
+		tools._execute_key_press
+	)
 
-func _create_key_press_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_KEY_PRESS,
-			"Simulates a key press and hold",
-			{
-				"key": {"type": "string", "description": "Key name (e.g., 'KEY_A', 'KEY_SPACE', 'KEY_UP')"},
-				"shift": {"type": "boolean", "default": false},
-				"ctrl": {"type": "boolean", "default": false},
-				"alt": {"type": "boolean", "default": false},
-				"duration_ms": {"type": "integer", "default": 100, "description": "Press duration in milliseconds"}
-			},
-			["key"]
-		)
-	return MCPToolHandler.new(definition, _execute_key_press)
+	registry.register_tool(
+		_create_tool_def("runtime_input_key_tap", "Simulates a quick key tap (press and release)", {
+			"key": {"type": "string", "description": "Key name"},
+			"shift": {"type": "boolean", "default": false},
+			"ctrl": {"type": "boolean", "default": false},
+			"alt": {"type": "boolean", "default": false}
+		}, ["key"]),
+		tools._execute_key_tap
+	)
 
+	registry.register_tool(
+		_create_tool_def("runtime_input_key_release", "Releases a held key", {
+			"key": {"type": "string", "description": "Key name to release"}
+		}, ["key"]),
+		tools._execute_key_release
+	)
 
-func _create_key_tap_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_KEY_TAP,
-			"Simulates a quick key tap (press and release)",
-			{
-				"key": {"type": "string", "description": "Key name"},
-				"shift": {"type": "boolean", "default": false},
-				"ctrl": {"type": "boolean", "default": false},
-				"alt": {"type": "boolean", "default": false}
-			},
-			["key"]
-		)
-	return MCPToolHandler.new(definition, _execute_key_tap)
-
-
-func _create_key_release_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_KEY_RELEASE,
-			"Releases a held key",
-			{
-				"key": {"type": "string", "description": "Key name to release"}
-			},
-			["key"]
-		)
-	return MCPToolHandler.new(definition, _execute_key_release)
-
-
-func _create_mouse_move_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_MOUSE_MOVE,
-			"Moves the mouse to a position",
-			{
-				"position": {
-					"type": "object",
-					"properties": {
-						"x": {"type": "number"},
-						"y": {"type": "number"}
-					},
-					"required": ["x", "y"]
+	registry.register_tool(
+		_create_tool_def("runtime_input_mouse_move", "Moves the mouse to a position", {
+			"position": {
+				"type": "object",
+				"properties": {
+					"x": {"type": "number"},
+					"y": {"type": "number"}
 				},
-				"relative": {"type": "boolean", "default": false, "description": "Position is relative"}
+				"required": ["x", "y"]
 			},
-			["position"]
-		)
-	return MCPToolHandler.new(definition, _execute_mouse_move)
+			"relative": {"type": "boolean", "default": false, "description": "Position is relative"}
+		}, ["position"]),
+		tools._execute_mouse_move
+	)
 
+	registry.register_tool(
+		_create_tool_def("runtime_input_mouse_click", "Simulates a mouse button click", {
+			"button": {"type": "string", "enum": ["left", "right", "middle"], "default": "left"},
+			"position": {"type": "object", "description": "Click position"},
+			"double": {"type": "boolean", "default": false, "description": "Double click"},
+			"duration_ms": {"type": "integer", "default": 50}
+		}, []),
+		tools._execute_mouse_click
+	)
 
-func _create_mouse_click_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_MOUSE_CLICK,
-			"Simulates a mouse button click",
-			{
-				"button": {"type": "string", "enum": ["left", "right", "middle"], "default": "left"},
-				"position": {"type": "object", "description": "Click position"},
-				"double": {"type": "boolean", "default": false, "description": "Double click"},
-				"duration_ms": {"type": "integer", "default": 50}
-			},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_mouse_click)
+	registry.register_tool(
+		_create_tool_def("runtime_input_action_press", "Simulates an input action press", {
+			"action": {"type": "string", "description": "Action name from InputMap"},
+			"strength": {"type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0}
+		}, ["action"]),
+		tools._execute_action_press
+	)
 
+	registry.register_tool(
+		_create_tool_def("runtime_input_action_release", "Releases an input action", {
+			"action": {"type": "string", "description": "Action name to release"}
+		}, ["action"]),
+		tools._execute_action_release
+	)
 
-func _create_action_press_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_ACTION_PRESS,
-			"Simulates an input action press",
-			{
-				"action": {"type": "string", "description": "Action name from InputMap"},
-				"strength": {"type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0}
-			},
-			["action"]
-		)
-	return MCPToolHandler.new(definition, _execute_action_press)
+	registry.register_tool(
+		_create_tool_def("runtime_input_type_text", "Types a string of text character by character", {
+			"text": {"type": "string", "description": "Text to type"},
+			"interval_ms": {"type": "integer", "default": 50, "description": "Delay between keystrokes"}
+		}, ["text"]),
+		tools._execute_type_text
+	)
 
-
-func _create_action_release_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_ACTION_RELEASE,
-			"Releases an input action",
-			{
-				"action": {"type": "string", "description": "Action name to release"}
-			},
-			["action"]
-		)
-	return MCPToolHandler.new(definition, _execute_action_release)
-
-
-func _create_type_text_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_TYPE_TEXT,
-			"Types a string of text character by character",
-			{
-				"text": {"type": "string", "description": "Text to type"},
-				"interval_ms": {"type": "integer", "default": 50, "description": "Delay between keystrokes"}
-			},
-			["text"]
-		)
-	return MCPToolHandler.new(definition, _execute_type_text)
+	return tools
 
 
 # --- Key Mapping Helpers ---
@@ -207,22 +147,21 @@ func _parse_key(key_name: String) -> Key:
 		"KEY_ALT": return KEY_ALT
 		_:
 			# Unknown key - return KEY_UNKNOWN
-			_logger.warning("Unknown key name", {"key": key_name})
 			return KEY_UNKNOWN
 
 
 # --- Tool Implementations ---
 
-func _execute_key_press(params: Dictionary) -> MCPToolResult:
-	var key_name: String = params.get("key", "")
-	var shift: bool = params.get("shift", false)
-	var ctrl: bool = params.get("ctrl", false)
-	var alt: bool = params.get("alt", false)
-	var duration_ms: int = params.get("duration_ms", 100)
+func _execute_key_press(args: Dictionary) -> Dictionary:
+	var key_name: String = args.get("key", "")
+	var shift: bool = args.get("shift", false)
+	var ctrl: bool = args.get("ctrl", false)
+	var alt: bool = args.get("alt", false)
+	var duration_ms: int = args.get("duration_ms", 100)
 
 	var key_code: Key = _parse_key(key_name)
 	if key_code == KEY_UNKNOWN:
-		return MCPToolResult.error("Unknown key: %s" % key_name, MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Unknown key: %s" % key_name}], "isError": true}
 
 	# Create key press event
 	var event := InputEventKey.new()
@@ -243,19 +182,21 @@ func _execute_key_press(params: Dictionary) -> MCPToolResult:
 		await _get_tree().create_timer(duration_ms / 1000.0).timeout
 		_release_key(key_code)
 
-	_logger.info("Key press", {"key": key_name, "duration_ms": duration_ms})
-	return MCPToolResult.text("Pressed %s for %dms" % [key_name, duration_ms])
+	return {
+		"content": [{"type": "text", "text": "Pressed %s for %dms" % [key_name, duration_ms]}],
+		"isError": false
+	}
 
 
-func _execute_key_tap(params: Dictionary) -> MCPToolResult:
-	var key_name: String = params.get("key", "")
-	var shift: bool = params.get("shift", false)
-	var ctrl: bool = params.get("ctrl", false)
-	var alt: bool = params.get("alt", false)
+func _execute_key_tap(args: Dictionary) -> Dictionary:
+	var key_name: String = args.get("key", "")
+	var shift: bool = args.get("shift", false)
+	var ctrl: bool = args.get("ctrl", false)
+	var alt: bool = args.get("alt", false)
 
 	var key_code: Key = _parse_key(key_name)
 	if key_code == KEY_UNKNOWN:
-		return MCPToolResult.error("Unknown key: %s" % key_name, MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Unknown key: %s" % key_name}], "isError": true}
 
 	# Press
 	var press_event := InputEventKey.new()
@@ -278,22 +219,30 @@ func _execute_key_tap(params: Dictionary) -> MCPToolResult:
 	release_event.alt_pressed = alt
 	Input.parse_input_event(release_event)
 
-	_logger.info("Key tap", {"key": key_name})
-	return MCPToolResult.text("Tapped %s" % key_name)
+	return {
+		"content": [{"type": "text", "text": "Tapped %s" % key_name}],
+		"isError": false
+	}
 
 
-func _execute_key_release(params: Dictionary) -> MCPToolResult:
-	var key_name: String = params.get("key", "")
+func _execute_key_release(args: Dictionary) -> Dictionary:
+	var key_name: String = args.get("key", "")
 
 	var key_code: Key = _parse_key(key_name)
 	if key_code == KEY_UNKNOWN:
-		return MCPToolResult.error("Unknown key: %s" % key_name, MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Unknown key: %s" % key_name}], "isError": true}
 
 	if not _held_keys.get(key_code, false):
-		return MCPToolResult.text("Key %s was not held" % key_name)
+		return {
+			"content": [{"type": "text", "text": "Key %s was not held" % key_name}],
+			"isError": false
+		}
 
 	_release_key(key_code)
-	return MCPToolResult.text("Released %s" % key_name)
+	return {
+		"content": [{"type": "text", "text": "Released %s" % key_name}],
+		"isError": false
+	}
 
 
 func _release_key(key_code: Key) -> void:
@@ -304,9 +253,9 @@ func _release_key(key_code: Key) -> void:
 	_held_keys.erase(key_code)
 
 
-func _execute_mouse_move(params: Dictionary) -> MCPToolResult:
-	var position_data: Dictionary = params.get("position", {})
-	var relative: bool = params.get("relative", false)
+func _execute_mouse_move(args: Dictionary) -> Dictionary:
+	var position_data: Dictionary = args.get("position", {})
+	var relative: bool = args.get("relative", false)
 
 	var x: float = position_data.get("x", 0.0)
 	var y: float = position_data.get("y", 0.0)
@@ -325,15 +274,17 @@ func _execute_mouse_move(params: Dictionary) -> MCPToolResult:
 
 	Input.parse_input_event(event)
 
-	_logger.info("Mouse move", {"x": x, "y": y, "relative": relative})
-	return MCPToolResult.text("Mouse moved to (%.0f, %.0f)" % [x, y])
+	return {
+		"content": [{"type": "text", "text": "Mouse moved to (%.0f, %.0f)" % [x, y]}],
+		"isError": false
+	}
 
 
-func _execute_mouse_click(params: Dictionary) -> MCPToolResult:
-	var button_str: String = params.get("button", "left")
-	var position_data: Dictionary = params.get("position", {})
-	var double_click: bool = params.get("double", false)
-	var duration_ms: int = params.get("duration_ms", 50)
+func _execute_mouse_click(args: Dictionary) -> Dictionary:
+	var button_str: String = args.get("button", "left")
+	var position_data: Dictionary = args.get("position", {})
+	var double_click: bool = args.get("double", false)
+	var duration_ms: int = args.get("duration_ms", 50)
 
 	var button_index: MouseButton
 	match button_str.to_lower():
@@ -341,7 +292,7 @@ func _execute_mouse_click(params: Dictionary) -> MCPToolResult:
 		"right": button_index = MOUSE_BUTTON_RIGHT
 		"middle": button_index = MOUSE_BUTTON_MIDDLE
 		_:
-			return MCPToolResult.error("Invalid button: %s" % button_str, MCPError.Code.INVALID_PARAMS)
+			return {"content": [{"type": "text", "text": "Error: Invalid button: %s" % button_str}], "isError": true}
 
 	var x: float = position_data.get("x", 0.0)
 	var y: float = position_data.get("y", 0.0)
@@ -378,46 +329,55 @@ func _execute_mouse_click(params: Dictionary) -> MCPToolResult:
 
 	Input.parse_input_event(release_event)
 
-	_logger.info("Mouse click", {"button": button_str, "position": [x, y], "double": double_click})
-	return MCPToolResult.text("%s click at (%.0f, %.0f)" % ["Double" if double_click else "", x, y])
+	return {
+		"content": [{"type": "text", "text": "%s click at (%.0f, %.0f)" % ["Double" if double_click else "", x, y]}],
+		"isError": false
+	}
 
 
-func _execute_action_press(params: Dictionary) -> MCPToolResult:
-	var action: String = params.get("action", "")
-	var strength: float = params.get("strength", 1.0)
+func _execute_action_press(args: Dictionary) -> Dictionary:
+	var action: String = args.get("action", "")
+	var strength: float = args.get("strength", 1.0)
 
 	if not InputMap.has_action(action):
-		return MCPToolResult.error("Action not found in InputMap: %s" % action, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Action not found in InputMap: %s" % action}], "isError": true}
 
 	Input.action_press(action, strength)
 	_held_actions[action] = true
 
-	_logger.info("Action press", {"action": action, "strength": strength})
-	return MCPToolResult.text("Pressed action: %s" % action)
+	return {
+		"content": [{"type": "text", "text": "Pressed action: %s" % action}],
+		"isError": false
+	}
 
 
-func _execute_action_release(params: Dictionary) -> MCPToolResult:
-	var action: String = params.get("action", "")
+func _execute_action_release(args: Dictionary) -> Dictionary:
+	var action: String = args.get("action", "")
 
 	if not InputMap.has_action(action):
-		return MCPToolResult.error("Action not found in InputMap: %s" % action, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Action not found in InputMap: %s" % action}], "isError": true}
 
 	if not _held_actions.get(action, false):
-		return MCPToolResult.text("Action %s was not pressed" % action)
+		return {
+			"content": [{"type": "text", "text": "Action %s was not pressed" % action}],
+			"isError": false
+		}
 
 	Input.action_release(action)
 	_held_actions.erase(action)
 
-	_logger.info("Action release", {"action": action})
-	return MCPToolResult.text("Released action: %s" % action)
+	return {
+		"content": [{"type": "text", "text": "Released action: %s" % action}],
+		"isError": false
+	}
 
 
-func _execute_type_text(params: Dictionary) -> MCPToolResult:
-	var text: String = params.get("text", "")
-	var interval_ms: int = params.get("interval_ms", 50)
+func _execute_type_text(args: Dictionary) -> Dictionary:
+	var text: String = args.get("text", "")
+	var interval_ms: int = args.get("interval_ms", 50)
 
 	if text.is_empty():
-		return MCPToolResult.text("No text to type")
+		return {"content": [{"type": "text", "text": "No text to type"}], "isError": false}
 
 	var chars_typed: int = 0
 
@@ -439,8 +399,10 @@ func _execute_type_text(params: Dictionary) -> MCPToolResult:
 
 		chars_typed += 1
 
-	_logger.info("Text typed", {"length": text.length()})
-	return MCPToolResult.text("Typed %d characters" % chars_typed)
+	return {
+		"content": [{"type": "text", "text": "Typed %d characters" % chars_typed}],
+		"isError": false
+	}
 
 
 func _get_tree() -> SceneTree:
@@ -452,3 +414,17 @@ func _get_viewport() -> Viewport:
 	if tree == null:
 		return null
 	return tree.root
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	var tool_def: Dictionary = {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

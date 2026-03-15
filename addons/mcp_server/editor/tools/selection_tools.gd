@@ -3,65 +3,57 @@
 extends RefCounted
 class_name SelectionTools
 
-const TOOL_GET := "selection_get"
-const TOOL_SET := "selection_set"
-const TOOL_CLEAR := "selection_clear"
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
 
 var _editor_interface: EditorInterface
-var _logger: MCPLogger
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("SelectionTools") if logger else MCPLogger.new("[SelectionTools]")
+func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 
 
-## Registers all selection tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_get_tool())
-	registry.register(_create_set_tool())
-	registry.register(_create_clear_tool())
+## Registers all selection tools with the registry
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted, editor_interface: EditorInterface) -> RefCounted:
+	var tools := SelectionTools.new(editor_interface)
 
+	registry.register_tool(
+		_create_tool_def("selection_get", "Gets currently selected nodes in the editor", {}, [], {
+			"type": "object",
+			"properties": {
+				"count": {"type": "integer", "description": "Number of selected nodes"},
+				"nodes": {"type": "array", "items": {"type": "object"}, "description": "Array of selected node info with path, name, type"}
+			}
+		}),
+		tools._execute_get
+	)
 
-func _create_get_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_GET,
-			"Gets currently selected nodes in the editor",
-			{},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_get)
+	registry.register_tool(
+		_create_tool_def("selection_set", "Sets the editor selection", {
+			"paths": {"type": "array", "items": {"type": "string"}, "description": "Node paths to select"},
+			"additive": {"type": "boolean", "default": false, "description": "Add to current selection"}
+		}, ["paths"], {
+			"type": "object",
+			"properties": {
+				"count": {"type": "integer", "description": "Number of nodes selected"},
+				"requested": {"type": "integer", "description": "Number of paths requested"},
+				"errors": {"type": "array", "items": {"type": "string"}, "description": "Error messages for failed selections"}
+			}
+		}),
+		tools._execute_set
+	)
 
+	registry.register_tool(
+		_create_tool_def("selection_clear", "Clears the editor selection", {}, [], {
+			"type": "object",
+			"properties": {
+				"cleared_count": {"type": "integer", "description": "Number of nodes that were selected"}
+			}
+		}),
+		tools._execute_clear
+	)
 
-func _create_set_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_SET,
-			"Sets the editor selection",
-			{
-				"paths": {
-					"type": "array",
-					"items": {"type": "string"},
-					"description": "Node paths to select"
-				},
-				"additive": {
-					"type": "boolean",
-					"default": false,
-					"description": "Add to current selection"
-				}
-			},
-			["paths"]
-		)
-	return MCPToolHandler.new(definition, _execute_set)
-
-
-func _create_clear_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_CLEAR,
-			"Clears the editor selection",
-			{},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_clear)
+	return tools
 
 
 # --- Tool Implementations ---
@@ -70,12 +62,16 @@ func _get_selection() -> EditorSelection:
 	return _editor_interface.get_selection()
 
 
-func _execute_get(_params: Dictionary = {}) -> MCPToolResult:
+func _execute_get(_args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
+
 	var selection: EditorSelection = _get_selection()
 	if selection == null:
-		return MCPToolResult.text("No selection available", {"count": 0, "nodes": []})
+		return MCPToolRegistry.create_response("No selection available", {
+			"count": 0,
+			"nodes": []
+		})
 
 	var selected_nodes: Array[Node] = selection.get_selected_nodes()
 	var nodes_info: Array[Dictionary] = []
@@ -87,24 +83,22 @@ func _execute_get(_params: Dictionary = {}) -> MCPToolResult:
 			"type": node.get_class()
 		})
 
-	return MCPToolResult.text(
-		"%d node(s) selected" % nodes_info.size(),
-		{
-			"count": nodes_info.size(),
-			"nodes": nodes_info
-		}
-	)
+	return MCPToolRegistry.create_response("%d node(s) selected" % nodes_info.size(), {
+		"count": nodes_info.size(),
+		"nodes": nodes_info
+	})
 
 
-func _execute_set(params: Dictionary) -> MCPToolResult:
+func _execute_set(args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
-	var paths: Array = params.get("paths", [])
-	var additive: bool = params.get("additive", false)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
+
+	var paths: Array = args.get("paths", [])
+	var additive: bool = args.get("additive", false)
 
 	var selection: EditorSelection = _get_selection()
 	if selection == null:
-		return MCPToolResult.error("Selection not available", MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Selection not available"}], "isError": true}
 
 	# Clear current selection if not additive
 	if not additive:
@@ -112,7 +106,7 @@ func _execute_set(params: Dictionary) -> MCPToolResult:
 
 	var root: Node = _editor_interface.get_edited_scene_root()
 	if root == null:
-		return MCPToolResult.error("No scene is open", MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: No scene is open"}], "isError": true}
 
 	var selected_count: int = 0
 	var errors: Array[String] = []
@@ -130,27 +124,39 @@ func _execute_set(params: Dictionary) -> MCPToolResult:
 		selection.add_node(node)
 		selected_count += 1
 
-	var data: Dictionary = {
-		"count": selected_count,
-		"requested": paths.size()
-	}
+	var data: Dictionary = {"count": selected_count, "requested": paths.size()}
 
 	if not errors.is_empty():
 		data["errors"] = errors
 
-	_logger.info("Selection set", {"count": selected_count, "additive": additive})
-	return MCPToolResult.text("Selected %d node(s)" % selected_count, data)
+	return MCPToolRegistry.create_response("Selected %d node(s)" % selected_count, data)
 
 
-func _execute_clear(_params: Dictionary = {}) -> MCPToolResult:
+func _execute_clear(_args: Dictionary) -> Dictionary:
 	if _editor_interface == null:
-		return MCPToolResult.error("Editor interface not available", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
+
 	var selection: EditorSelection = _get_selection()
 	if selection == null:
-		return MCPToolResult.text("No selection to clear")
+		return {"content": [{"type": "text", "text": "No selection to clear"}], "isError": false}
 
 	var count: int = selection.get_selected_nodes().size()
 	selection.clear()
 
-	_logger.info("Selection cleared", {"previous_count": count})
-	return MCPToolResult.text("Cleared selection (%d nodes)" % count, {"cleared_count": count})
+	return MCPToolRegistry.create_response("Cleared selection (%d nodes)" % count, {
+		"cleared_count": count
+	})
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	var tool_def: Dictionary = {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

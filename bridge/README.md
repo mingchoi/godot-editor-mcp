@@ -1,54 +1,70 @@
-# MCP stdio-to-WebSocket Bridge
+# Godot MCP Stdio-to-WebSocket Bridge
 
-Connects MCP clients (Claude Code, etc.) to the Godot Editor WebSocket MCP server.
+A simple Node.js bridge that forwards stdio (MCP protocol) to WebSocket for connecting Claude Desktop to the Godot MCP Server.
+
+## Installation
+
+```bash
+cd mcp-stdio-websocket-bridge
+npm install
+```
 
 ## Usage
 
-### Claude Code Configuration
+### Direct usage
+```bash
+node index.js ws://127.0.0.1:8765
+```
 
-Add to `~/.claude/mcp_servers.json`:
+### Claude Desktop Configuration
+
+Add to your Claude Desktop config (`claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
-    "godot-editor": {
+    "godot-mcp": {
       "command": "node",
-      "args": ["/path/to/godot-editor-mcp/bridge/index.mjs"]
+      "args": [
+        "/path/to/godot-editor-mcp/mcp-stdio-websocket-bridge/index.js",
+        "ws://127.0.0.1:8765"
+      ]
     }
   }
 }
 ```
 
-### Options
-
-| Env Variable | Default | Description |
-|--------------|---------|-------------|
-| `MCP_WS_PORT` | 8765 | WebSocket port |
-| `MCP_WS_HOST` | localhost | WebSocket host |
-
-Example with custom port:
-```json
-{
-  "mcpServers": {
-    "godot-editor": {
-      "command": "node",
-      "args": ["/path/to/godot-editor-mcp/bridge/index.mjs"],
-      "env": {
-        "MCP_WS_PORT": "9000"
-      }
-    }
-  }
-}
-```
-
-### Testing
+### Using npm script (after npm link)
 
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node index.mjs
+npm install -g .
+```
+
+Then in config:
+```json
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "command": "godot-mcp-bridge",
+      "args": ["ws://127.0.0.1:8765"]
+    }
+  }
+}
 ```
 
 ## Architecture
 
 ```
-Claude Code <--stdio--> Bridge <--WebSocket:8765--> Godot Editor
+Claude Desktop <--(stdio)--> Bridge <--(WebSocket)--> Godot MCP Server (port 8765)
 ```
+
+The bridge acts as a transparent proxy, converting between:
+- **stdio**: Line-delimited JSON-RPC messages (MCP protocol over stdio)
+- **WebSocket**: Binary WebSocket frames with JSON-RPC messages (MCP protocol over WebSocket)
+
+## Features
+
+- Auto-reconnect with 2-second backoff
+- Message queuing while WebSocket is connecting
+- Graceful shutdown on SIGINT/SIGTERM
+- Transparent message forwarding (no protocol modification)

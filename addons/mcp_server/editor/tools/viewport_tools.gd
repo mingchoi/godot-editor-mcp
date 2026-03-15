@@ -3,11 +3,7 @@
 extends RefCounted
 class_name EditorViewportTools
 
-# Tool name constants
-const TOOL_FOCUS_ON_NODE := "viewport_focus_on_node"
-const TOOL_SET_CAMERA := "viewport_set_camera"
-const TOOL_ORBIT := "viewport_orbit"
-const TOOL_ZOOM := "viewport_zoom"
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
 
 # Zoom factor constraints
 const ZOOM_MIN := 0.01
@@ -16,119 +12,106 @@ const ZOOM_MAX := 100.0
 # Default distance for focusing on nodes without geometry
 const DEFAULT_FOCUS_DISTANCE := 5.0
 
-var _logger: MCPLogger
 var _editor_interface: EditorInterface
 var _focus_point: Vector3 = Vector3.ZERO
 var _focus_node_path: String = ""
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("EditorViewportTools") if logger else MCPLogger.new("[EditorViewportTools]")
+func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 
 
-## Registers all viewport tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_focus_tool())
-	registry.register(_create_set_camera_tool())
-	registry.register(_create_orbit_tool())
-	registry.register(_create_zoom_tool())
-	_logger.info("Viewport tools registered", {"count": 4})
+## Registers all viewport tools with the registry
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted, editor_interface: EditorInterface) -> RefCounted:
+	var tools := EditorViewportTools.new(editor_interface)
 
-
-# --- Tool Definitions ---
-
-func _create_focus_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_FOCUS_ON_NODE,
-		"Focus the editor viewport camera on a specific scene node, centering it in the view",
-		{
-			"path": {
-				"type": "string",
-				"description": "Node path to focus on (e.g., 'Main/Player' or '/root/Main/Player')"
+	registry.register_tool(
+		_create_tool_def("viewport_focus_on_node", "Focus the editor viewport camera on a specific scene node, centering it in the view", {
+			"path": {"type": "string", "description": "Node path to focus on (e.g., 'Main/Player' or '/root/Main/Player')"}
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether focus succeeded"},
+				"node_path": {"type": "string", "description": "Path of the focused node"},
+				"node_name": {"type": "string", "description": "Name of the focused node"},
+				"focus_position": {"type": "object", "description": "3D position of the focus point"},
+				"camera_position": {"type": "object", "description": "3D position of the camera"},
+				"distance": {"type": "number", "description": "Distance from camera to focus point"}
 			}
-		},
-		["path"]
+		}),
+		tools._execute_focus
 	)
-	return MCPToolHandler.new(definition, _execute_focus)
 
-
-func _create_set_camera_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_SET_CAMERA,
-		"Position the editor viewport camera at a specific location and set its look-at target",
-		{
+	registry.register_tool(
+		_create_tool_def("viewport_set_camera", "Position the editor viewport camera at a specific location and set its look-at target", {
 			"position": {
 				"type": "object",
 				"description": "Camera position in world coordinates",
-				"properties": {
-					"x": {"type": "number"},
-					"y": {"type": "number"},
-					"z": {"type": "number"}
-				}
+				"properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
 			},
 			"look_at": {
 				"type": "object",
 				"description": "Point the camera should look at in world coordinates",
-				"properties": {
-					"x": {"type": "number"},
-					"y": {"type": "number"},
-					"z": {"type": "number"}
-				}
+				"properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
 			}
-		},
-		["position", "look_at"]
+		}, ["position", "look_at"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether positioning succeeded"},
+				"camera_position": {"type": "object", "description": "3D camera position"},
+				"look_at": {"type": "object", "description": "3D look-at target position"},
+				"distance": {"type": "number", "description": "Distance from camera to look-at point"}
+			}
+		}),
+		tools._execute_set_camera
 	)
-	return MCPToolHandler.new(definition, _execute_set_camera)
 
-
-func _create_orbit_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_ORBIT,
-		"Orbit the camera around the current focus point by specified rotation angles",
-		{
+	registry.register_tool(
+		_create_tool_def("viewport_orbit", "Orbit the camera around the current focus point by specified rotation angles", {
 			"delta_rotation": {
 				"type": "object",
 				"description": "Rotation deltas in degrees",
 				"properties": {
-					"x": {
-						"type": "number",
-						"default": 0,
-						"description": "Pitch rotation (tilt up/down) in degrees"
-					},
-					"y": {
-						"type": "number",
-						"default": 0,
-						"description": "Yaw rotation (pan left/right) in degrees"
-					},
-					"z": {
-						"type": "number",
-						"default": 0,
-						"description": "Roll rotation in degrees"
-					}
+					"x": {"type": "number", "default": 0, "description": "Pitch rotation (tilt up/down) in degrees"},
+					"y": {"type": "number", "default": 0, "description": "Yaw rotation (pan left/right) in degrees"},
+					"z": {"type": "number", "default": 0, "description": "Roll rotation in degrees"}
 				}
 			}
-		},
-		["delta_rotation"]
+		}, ["delta_rotation"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether orbit succeeded"},
+				"focus_point": {"type": "object", "description": "3D focus point position"},
+				"camera_position": {"type": "object", "description": "3D camera position after orbit"},
+				"rotation_applied": {"type": "object", "description": "Rotation angles applied in degrees"}
+			}
+		}),
+		tools._execute_orbit
 	)
-	return MCPToolHandler.new(definition, _execute_orbit)
 
-
-func _create_zoom_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-		TOOL_ZOOM,
-		"Zoom the camera in or out relative to the current focus point",
-		{
+	registry.register_tool(
+		_create_tool_def("viewport_zoom", "Zoom the camera in or out relative to the current focus point", {
 			"factor": {
 				"type": "number",
 				"description": "Zoom factor relative to current distance (0.5 = zoom in 2x closer, 2.0 = zoom out 2x farther)",
 				"minimum": ZOOM_MIN,
 				"maximum": ZOOM_MAX
 			}
-		},
-		["factor"]
+		}, ["factor"], {
+			"type": "object",
+			"properties": {
+				"success": {"type": "boolean", "description": "Whether zoom succeeded"},
+				"focus_point": {"type": "object", "description": "3D focus point position"},
+				"previous_distance": {"type": "number", "description": "Distance before zoom"},
+				"new_distance": {"type": "number", "description": "Distance after zoom"},
+				"zoom_factor": {"type": "number", "description": "Zoom factor applied"}
+			}
+		}),
+		tools._execute_zoom
 	)
-	return MCPToolHandler.new(definition, _execute_zoom)
+
+	return tools
 
 
 # --- Helper Methods ---
@@ -211,27 +194,18 @@ func _calculate_node_bounds(node: Node) -> AABB:
 
 # --- Tool Implementations ---
 
-func _execute_focus(params: Dictionary) -> MCPToolResult:
+func _execute_focus(args: Dictionary) -> Dictionary:
 	var camera: Camera3D = _get_camera_3d()
 	if camera == null:
-		return MCPToolResult.error(
-			"No 3D viewport available. Open a 3D viewport first.",
-			MCPError.Code.TOOL_EXECUTION_ERROR
-		)
+		return {"content": [{"type": "text", "text": "Error: No 3D viewport available. Open a 3D viewport first."}], "isError": true}
 
-	var path: String = params.get("path", "")
+	var path: String = args.get("path", "")
 	if path.is_empty():
-		return MCPToolResult.error(
-			"Node path is required.",
-			MCPError.Code.INVALID_PARAMS
-		)
+		return {"content": [{"type": "text", "text": "Error: Node path is required."}], "isError": true}
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error(
-			"Node not found: %s. Check the node path." % path,
-			MCPError.Code.NOT_FOUND
-		)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s. Check the node path." % path}], "isError": true}
 
 	# Get node position
 	var node_3d: Node3D = null
@@ -246,10 +220,7 @@ func _execute_focus(params: Dictionary) -> MCPToolResult:
 			node_3d = parent
 
 	if node_3d == null:
-		return MCPToolResult.error(
-			"Node '%s' is not a 3D node and has no 3D parent." % path,
-			MCPError.Code.TOOL_EXECUTION_ERROR
-		)
+		return {"content": [{"type": "text", "text": "Error: Node '%s' is not a 3D node and has no 3D parent." % path}], "isError": true}
 
 	var target_position: Vector3 = node_3d.get_global_position()
 	var bounds: AABB = _calculate_node_bounds(node_3d)
@@ -278,59 +249,38 @@ func _execute_focus(params: Dictionary) -> MCPToolResult:
 	_focus_point = target_position
 	_focus_node_path = path
 
-	_logger.info("Focused on node", {
-		"path": path,
-		"position": {"x": target_position.x, "y": target_position.y, "z": target_position.z},
+	return MCPToolRegistry.create_response("Camera focused on node '%s' at position (%.2f, %.2f, %.2f)" % [path, target_position.x, target_position.y, target_position.z], {
+		"success": true,
+		"node_path": path,
+		"node_name": node.name,
+		"focus_position": {"x": target_position.x, "y": target_position.y, "z": target_position.z},
+		"camera_position": {"x": new_camera_position.x, "y": new_camera_position.y, "z": new_camera_position.z},
 		"distance": distance
 	})
 
-	return MCPToolResult.text(
-		"Camera focused on node '%s' at position (%.2f, %.2f, %.2f)" % [path, target_position.x, target_position.y, target_position.z],
-		{
-			"success": true,
-			"node_path": path,
-			"node_name": node.name,
-			"focus_position": {"x": target_position.x, "y": target_position.y, "z": target_position.z},
-			"camera_position": {"x": new_camera_position.x, "y": new_camera_position.y, "z": new_camera_position.z},
-			"distance": distance
-		}
-	)
 
-
-func _execute_set_camera(params: Dictionary) -> MCPToolResult:
+func _execute_set_camera(args: Dictionary) -> Dictionary:
 	var camera: Camera3D = _get_camera_3d()
 	if camera == null:
-		return MCPToolResult.error(
-			"No 3D viewport available. Open a 3D viewport first.",
-			MCPError.Code.TOOL_EXECUTION_ERROR
-		)
+		return {"content": [{"type": "text", "text": "Error: No 3D viewport available. Open a 3D viewport first."}], "isError": true}
 
 	# Validate position
-	var position_dict: Dictionary = params.get("position", {})
+	var position_dict: Dictionary = args.get("position", {})
 	var position_result: Dictionary = _validate_vector3(position_dict)
 	if not position_result.valid:
-		return MCPToolResult.error(
-			position_result.error,
-			MCPError.Code.INVALID_PARAMS
-		)
+		return {"content": [{"type": "text", "text": "Error: %s" % position_result.error}], "isError": true}
 	var position: Vector3 = position_result.vector
 
 	# Validate look_at
-	var look_at_dict: Dictionary = params.get("look_at", {})
+	var look_at_dict: Dictionary = args.get("look_at", {})
 	var look_at_result: Dictionary = _validate_vector3(look_at_dict)
 	if not look_at_result.valid:
-		return MCPToolResult.error(
-			look_at_result.error,
-			MCPError.Code.INVALID_PARAMS
-		)
+		return {"content": [{"type": "text", "text": "Error: %s" % look_at_result.error}], "isError": true}
 	var look_at: Vector3 = look_at_result.vector
 
 	# Check that position and look_at are not the same
 	if position.is_equal_approx(look_at):
-		return MCPToolResult.error(
-			"Camera position cannot be the same as look-at target.",
-			MCPError.Code.INVALID_PARAMS
-		)
+		return {"content": [{"type": "text", "text": "Error: Camera position cannot be the same as look-at target."}], "isError": true}
 
 	# Position the camera
 	camera.look_at_from_position(position, look_at, Vector3.UP)
@@ -341,41 +291,23 @@ func _execute_set_camera(params: Dictionary) -> MCPToolResult:
 
 	var distance: float = position.distance_to(look_at)
 
-	_logger.info("Camera positioned", {
-		"position": {"x": position.x, "y": position.y, "z": position.z},
+	return MCPToolRegistry.create_response("Camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)" % [position.x, position.y, position.z, look_at.x, look_at.y, look_at.z], {
+		"success": true,
+		"camera_position": {"x": position.x, "y": position.y, "z": position.z},
 		"look_at": {"x": look_at.x, "y": look_at.y, "z": look_at.z},
 		"distance": distance
 	})
 
-	return MCPToolResult.text(
-		"Camera positioned at (%.2f, %.2f, %.2f) looking at (%.2f, %.2f, %.2f)" % [
-			position.x, position.y, position.z,
-			look_at.x, look_at.y, look_at.z
-		],
-		{
-			"success": true,
-			"camera_position": {"x": position.x, "y": position.y, "z": position.z},
-			"look_at": {"x": look_at.x, "y": look_at.y, "z": look_at.z},
-			"distance": distance
-		}
-	)
 
-
-func _execute_zoom(params: Dictionary) -> MCPToolResult:
+func _execute_zoom(args: Dictionary) -> Dictionary:
 	var camera: Camera3D = _get_camera_3d()
 	if camera == null:
-		return MCPToolResult.error(
-			"No 3D viewport available. Open a 3D viewport first.",
-			MCPError.Code.TOOL_EXECUTION_ERROR
-		)
+		return {"content": [{"type": "text", "text": "Error: No 3D viewport available. Open a 3D viewport first."}], "isError": true}
 
 	# Validate zoom factor
-	var factor: float = params.get("factor", 1.0)
+	var factor: float = args.get("factor", 1.0)
 	if not is_finite(factor) or factor < ZOOM_MIN or factor > ZOOM_MAX:
-		return MCPToolResult.error(
-			"Zoom factor must be between %.2f and %.2f, got %.2f." % [ZOOM_MIN, ZOOM_MAX, factor],
-			MCPError.Code.INVALID_PARAMS
-		)
+		return {"content": [{"type": "text", "text": "Error: Zoom factor must be between %.2f and %.2f, got %.2f." % [ZOOM_MIN, ZOOM_MAX, factor]}], "isError": true}
 
 	var current_position: Vector3 = camera.get_global_position()
 	var current_distance: float = current_position.distance_to(_focus_point)
@@ -396,44 +328,29 @@ func _execute_zoom(params: Dictionary) -> MCPToolResult:
 	# Position the camera
 	camera.look_at_from_position(new_position, _focus_point, Vector3.UP)
 
-	_logger.info("Camera zoomed", {
-		"factor": factor,
+	return MCPToolRegistry.create_response("Camera zoomed by factor %.2f (distance: %.2f -> %.2f)" % [factor, current_distance, new_distance], {
+		"success": true,
+		"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
 		"previous_distance": current_distance,
-		"new_distance": new_distance
+		"new_distance": new_distance,
+		"zoom_factor": factor
 	})
 
-	return MCPToolResult.text(
-		"Camera zoomed by factor %.2f (distance: %.2f -> %.2f)" % [factor, current_distance, new_distance],
-		{
-			"success": true,
-			"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
-			"previous_distance": current_distance,
-			"new_distance": new_distance,
-			"zoom_factor": factor
-		}
-	)
 
-
-func _execute_orbit(params: Dictionary) -> MCPToolResult:
+func _execute_orbit(args: Dictionary) -> Dictionary:
 	var camera: Camera3D = _get_camera_3d()
 	if camera == null:
-		return MCPToolResult.error(
-			"No 3D viewport available. Open a 3D viewport first.",
-			MCPError.Code.TOOL_EXECUTION_ERROR
-		)
+		return {"content": [{"type": "text", "text": "Error: No 3D viewport available. Open a 3D viewport first."}], "isError": true}
 
 	# Get rotation deltas (default to 0 for each axis)
-	var rotation_dict: Dictionary = params.get("delta_rotation", {})
+	var rotation_dict: Dictionary = args.get("delta_rotation", {})
 	var pitch: float = deg_to_rad(rotation_dict.get("x", 0.0))  # Pitch (tilt up/down)
 	var yaw: float = deg_to_rad(rotation_dict.get("y", 0.0))    # Yaw (pan left/right)
 	var roll: float = deg_to_rad(rotation_dict.get("z", 0.0))   # Roll
 
 	# Validate rotation values
 	if not is_finite(pitch) or not is_finite(yaw) or not is_finite(roll):
-		return MCPToolResult.error(
-			"Rotation values must be finite numbers.",
-			MCPError.Code.INVALID_PARAMS
-		)
+		return {"content": [{"type": "text", "text": "Error: Rotation values must be finite numbers."}], "isError": true}
 
 	var current_position: Vector3 = camera.get_global_position()
 	var distance: float = current_position.distance_to(_focus_point)
@@ -472,23 +389,23 @@ func _execute_orbit(params: Dictionary) -> MCPToolResult:
 	# Position the camera
 	camera.look_at_from_position(new_position, _focus_point, up_vector)
 
-	_logger.info("Camera orbited", {
-		"delta_rotation": {"x": rad_to_deg(pitch), "y": rad_to_deg(yaw), "z": rad_to_deg(roll)},
-		"new_position": {"x": new_position.x, "y": new_position.y, "z": new_position.z}
+	return MCPToolRegistry.create_response("Camera orbited by (%.1f, %.1f, %.1f) degrees" % [rad_to_deg(pitch), rad_to_deg(yaw), rad_to_deg(roll)], {
+		"success": true,
+		"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
+		"camera_position": {"x": new_position.x, "y": new_position.y, "z": new_position.z},
+		"rotation_applied": {"x": rad_to_deg(pitch), "y": rad_to_deg(yaw), "z": rad_to_deg(roll)}
 	})
 
-	return MCPToolResult.text(
-		"Camera orbited by (%.1f, %.1f, %.1f) degrees" % [
-			rad_to_deg(pitch), rad_to_deg(yaw), rad_to_deg(roll)
-		],
-		{
-			"success": true,
-			"focus_point": {"x": _focus_point.x, "y": _focus_point.y, "z": _focus_point.z},
-			"camera_position": {"x": new_position.x, "y": new_position.y, "z": new_position.z},
-			"rotation_applied": {
-				"x": rad_to_deg(pitch),
-				"y": rad_to_deg(yaw),
-				"z": rad_to_deg(roll)
-			}
-		}
-	)
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	var tool_def: Dictionary = {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

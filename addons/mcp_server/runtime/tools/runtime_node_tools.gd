@@ -3,67 +3,63 @@
 extends RefCounted
 class_name RuntimeNodeTools
 
-const TOOL_NODE_CREATE := "runtime_node_create"
-const TOOL_NODE_DELETE := "runtime_node_delete"
-const TOOL_INSTANTIATE_SCENE := "runtime_instantiate_scene"
-
-var _logger: MCPLogger
-
-
-func _init(logger: MCPLogger = null) -> void:
-	_logger = logger.child("RuntimeNodeTools") if logger else MCPLogger.new("[RuntimeNodeTools]")
-
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
 
 ## Registers all runtime node tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_node_create_tool())
-	registry.register(_create_node_delete_tool())
-	registry.register(_create_instantiate_scene_tool())
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted) -> RefCounted:
+	var tools := RuntimeNodeTools.new()
 
+	registry.register_tool(
+		_create_tool_def("runtime_node_create", "Creates a new node in the running game", {
+			"type": {"type": "string", "description": "Node type (e.g., 'Sprite2D', 'Node3D')"},
+			"parent": {"type": "string", "description": "Parent node path"},
+			"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
+			"properties": {"type": "object", "default": {}, "description": "Initial property values"}
+		}, ["type", "parent"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Full path of created node"},
+				"name": {"type": "string", "description": "Node name"},
+				"type": {"type": "string", "description": "Godot class name"}
+			}
+		}),
+		tools._execute_node_create
+	)
 
-# --- Tool Definitions ---
+	registry.register_tool(
+		_create_tool_def("runtime_node_delete", "Deletes a node from the running game", {
+			"path": {"type": "string", "description": "Node path to delete"}
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path of deleted node"},
+				"name": {"type": "string", "description": "Name of deleted node"},
+				"deleted": {"type": "boolean", "description": "Whether deletion succeeded"}
+			}
+		}),
+		tools._execute_node_delete
+	)
 
-func _create_node_create_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_NODE_CREATE,
-			"Creates a new node in the running game",
-			{
-				"type": {"type": "string", "description": "Node type (e.g., 'Sprite2D', 'Node3D')"},
-				"parent": {"type": "string", "description": "Parent node path"},
-				"name": {"type": "string", "description": "Node name (auto-generated if not provided)"},
-				"properties": {"type": "object", "default": {}, "description": "Initial property values"}
-			},
-			["type", "parent"]
-		)
-	return MCPToolHandler.new(definition, _execute_node_create)
+	registry.register_tool(
+		_create_tool_def("runtime_instantiate_scene", "Instantiates a scene file into the running game", {
+			"scene_path": {"type": "string", "description": "Scene resource path (e.g., 'res://scenes/enemy.tscn')"},
+			"parent": {"type": "string", "description": "Parent node path"},
+			"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"},
+			"position": {"type": "object", "default": {}, "description": "Initial position as {x, y, z} for 3D or {x, y} for 2D nodes"},
+			"rotation": {"type": "object", "default": {}, "description": "Initial rotation in degrees as {x, y, z} for 3D or {x, y, angle} for 2D nodes"}
+		}, ["scene_path", "parent"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Full path of instantiated scene"},
+				"name": {"type": "string", "description": "Instance root node name"},
+				"scene_path": {"type": "string", "description": "Source scene file path"}
+			}
+		}),
+		tools._execute_instantiate_scene
+	)
 
-
-func _create_node_delete_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_NODE_DELETE,
-			"Deletes a node from the running game",
-			{
-				"path": {"type": "string", "description": "Node path to delete"}
-			},
-			["path"]
-		)
-	return MCPToolHandler.new(definition, _execute_node_delete)
-
-
-func _create_instantiate_scene_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_INSTANTIATE_SCENE,
-			"Instantiates a scene file into the running game",
-			{
-				"scene_path": {"type": "string", "description": "Scene resource path (e.g., 'res://scenes/enemy.tscn')"},
-				"parent": {"type": "string", "description": "Parent node path"},
-				"name": {"type": "string", "description": "Name for the instance root (uses original if not provided)"},
-				"position": {"type": "object", "default": {}, "description": "Initial position as {x, y, z} for 3D or {x, y} for 2D nodes"},
-				"rotation": {"type": "object", "default": {}, "description": "Initial rotation in degrees as {x, y, z} for 3D or {x, y, angle} for 2D nodes"}
-			},
-			["scene_path", "parent"]
-		)
-	return MCPToolHandler.new(definition, _execute_instantiate_scene)
+	return tools
 
 
 # --- Helper Methods ---
@@ -85,25 +81,25 @@ func _resolve_node(path: String) -> Node:
 
 # --- Tool Implementations ---
 
-func _execute_node_create(params: Dictionary) -> MCPToolResult:
-	var node_type: String = params.get("type", "")
-	var node_name: String = params.get("name", "")
-	var parent_path: String = params.get("parent", "")
-	var properties: Dictionary = params.get("properties", {})
+func _execute_node_create(args: Dictionary) -> Dictionary:
+	var node_type: String = args.get("type", "")
+	var node_name: String = args.get("name", "")
+	var parent_path: String = args.get("parent", "")
+	var properties: Dictionary = args.get("properties", {})
 
 	# Validate type
 	if not ClassDB.class_exists(node_type):
-		return MCPToolResult.error("Unknown node type: %s" % node_type, MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Unknown node type: %s" % node_type}], "isError": true}
 
 	# Get parent
 	var parent: Node = _resolve_node(parent_path)
 	if parent == null:
-		return MCPToolResult.error("Parent node not found: %s" % parent_path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Parent node not found: %s" % parent_path}], "isError": true}
 
 	# Create node
 	var new_node: Node = ClassDB.instantiate(node_type)
 	if new_node == null:
-		return MCPToolResult.error("Failed to create node of type: %s" % node_type, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to create node of type: %s" % node_type}], "isError": true}
 
 	# Set name
 	if node_name.is_empty():
@@ -125,9 +121,8 @@ func _execute_node_create(params: Dictionary) -> MCPToolResult:
 	parent.add_child(new_node)
 
 	var full_path: String = "%s/%s" % [parent_path, new_node.name]
-	_logger.info("Node created", {"path": full_path, "type": node_type})
 
-	return MCPToolResult.text("Created node: %s" % full_path, {
+	return MCPToolRegistry.create_response("Created node: %s" % full_path, {
 		"path": str(new_node.get_path()),
 		"name": new_node.name,
 		"type": node_type,
@@ -135,17 +130,17 @@ func _execute_node_create(params: Dictionary) -> MCPToolResult:
 	})
 
 
-func _execute_node_delete(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
+func _execute_node_delete(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	# Protect scene root
 	var tree: SceneTree = _get_tree()
 	if tree != null and node == tree.root:
-		return MCPToolResult.error("Cannot delete scene root", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Cannot delete scene root"}], "isError": true}
 
 	var node_name: String = node.name
 	var node_path: String = str(node.get_path())
@@ -157,38 +152,37 @@ func _execute_node_delete(params: Dictionary) -> MCPToolResult:
 
 	node.queue_free()
 
-	_logger.info("Node deleted", {"path": path})
-	return MCPToolResult.text("Deleted node: %s" % path, {
+	return MCPToolRegistry.create_response("Deleted node: %s" % path, {
 		"path": node_path,
 		"name": node_name,
 		"deleted": true
 	})
 
 
-func _execute_instantiate_scene(params: Dictionary) -> MCPToolResult:
-	var scene_path: String = params.get("scene_path", "")
-	var parent_path: String = params.get("parent", "")
-	var custom_name: String = params.get("name", "")
-	var position_data: Dictionary = params.get("position", {})
-	var rotation_data: Dictionary = params.get("rotation", {})
+func _execute_instantiate_scene(args: Dictionary) -> Dictionary:
+	var scene_path: String = args.get("scene_path", "")
+	var parent_path: String = args.get("parent", "")
+	var custom_name: String = args.get("name", "")
+	var position_data: Dictionary = args.get("position", {})
+	var rotation_data: Dictionary = args.get("rotation", {})
 
 	# Load scene
 	if not ResourceLoader.exists(scene_path):
-		return MCPToolResult.error("Scene file not found: %s" % scene_path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Scene file not found: %s" % scene_path}], "isError": true}
 
 	var packed: PackedScene = ResourceLoader.load(scene_path)
 	if packed == null:
-		return MCPToolResult.error("Failed to load scene: %s" % scene_path, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to load scene: %s" % scene_path}], "isError": true}
 
 	# Get parent
 	var parent: Node = _resolve_node(parent_path)
 	if parent == null:
-		return MCPToolResult.error("Parent node not found: %s" % parent_path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Parent node not found: %s" % parent_path}], "isError": true}
 
 	# Instantiate
 	var instance: Node = packed.instantiate()
 	if instance == null:
-		return MCPToolResult.error("Failed to instantiate scene: %s" % scene_path, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to instantiate scene: %s" % scene_path}], "isError": true}
 
 	# Set custom name if provided
 	if not custom_name.is_empty():
@@ -238,15 +232,7 @@ func _execute_instantiate_scene(params: Dictionary) -> MCPToolResult:
 	var instance_path: String = str(instance.get_path())
 	var child_count: int = instance.get_child_count()
 
-	_logger.info("Scene instantiated", {
-		"scene_path": scene_path,
-		"instance_path": instance_path,
-		"child_count": child_count,
-		"position": position_data,
-		"rotation": rotation_data
-	})
-
-	return MCPToolResult.text("Instantiated scene: %s" % instance_path, {
+	return MCPToolRegistry.create_response("Instantiated scene: %s" % instance_path, {
 		"path": instance_path,
 		"name": instance.name,
 		"scene_path": scene_path,
@@ -368,3 +354,17 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 				return arr
 
 	return value
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	var tool_def: Dictionary = {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

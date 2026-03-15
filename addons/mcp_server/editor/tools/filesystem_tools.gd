@@ -3,137 +3,133 @@
 extends RefCounted
 class_name FileSystemTools
 
-const TOOL_LIST_DIR := "fs_list_dir"
-const TOOL_READ_FILE := "fs_read_file"
-const TOOL_WRITE_FILE := "fs_write_file"
-const TOOL_DELETE := "fs_delete"
-const TOOL_COPY := "fs_copy"
-const TOOL_MOVE := "fs_move"
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
 
-var _logger: MCPLogger
 var _editor_interface: EditorInterface
 
 
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("FileSystemTools") if logger else MCPLogger.new("[FileSystemTools]")
+func _init(editor_interface: EditorInterface) -> void:
 	_editor_interface = editor_interface
 
 
-## Registers all filesystem tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_list_dir_tool())
-	registry.register(_create_read_file_tool())
-	registry.register(_create_write_file_tool())
-	registry.register(_create_delete_tool())
-	registry.register(_create_copy_tool())
-	registry.register(_create_move_tool())
+## Registers all filesystem tools with the registry
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted, editor_interface: EditorInterface) -> RefCounted:
+	var tools := FileSystemTools.new(editor_interface)
 
+	registry.register_tool(
+		_create_tool_def("fs_list_dir", "Lists contents of a directory", {
+			"path": {"type": "string", "default": "res://", "description": "Directory path"},
+			"recursive": {"type": "boolean", "default": false},
+			"filter": {"type": "string", "description": "File extension filter (e.g., '*.gd')"}
+		}, [], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Directory path that was listed"},
+				"directories": {"type": "array", "items": {"type": "string"}, "description": "Directory names"},
+				"files": {"type": "array", "items": {"type": "object"}, "description": "File info with name, path, type, size"}
+			}
+		}),
+		tools._execute_list_dir
+	)
 
-func _create_list_dir_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_LIST_DIR,
-			"Lists contents of a directory",
-			{
-				"path": {"type": "string", "default": "res://", "description": "Directory path"},
-				"recursive": {"type": "boolean", "default": false},
-				"filter": {"type": "string", "description": "File extension filter (e.g., '*.gd')"}
-			},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_list_dir)
+	registry.register_tool(
+		_create_tool_def("fs_read_file", "Reads a text file's contents", {
+			"path": {"type": "string", "description": "File path"},
+			"start_line": {"type": "integer", "default": 1},
+			"end_line": {"type": "integer", "description": "End line (inclusive)"}
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "File path that was read"},
+				"content": {"type": "string", "description": "File content"},
+				"line_count": {"type": "integer", "description": "Number of lines in content"}
+			}
+		}),
+		tools._execute_read_file
+	)
 
+	registry.register_tool(
+		_create_tool_def("fs_write_file", "Writes content to a file", {
+			"path": {"type": "string", "description": "File path"},
+			"content": {"type": "string", "description": "Content to write"},
+			"mode": {"type": "string", "enum": ["write", "append"], "default": "write"}
+		}, ["path", "content"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "File path that was written"},
+				"mode": {"type": "string", "description": "Write mode used"},
+				"bytes_written": {"type": "integer", "description": "Number of bytes written"}
+			}
+		}),
+		tools._execute_write_file
+	)
 
-func _create_read_file_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_READ_FILE,
-			"Reads a text file's contents",
-			{
-				"path": {"type": "string", "description": "File path"},
-				"start_line": {"type": "integer", "default": 1},
-				"end_line": {"type": "integer", "description": "End line (inclusive)"}
-			},
-			["path"]
-		)
-	return MCPToolHandler.new(definition, _execute_read_file)
+	registry.register_tool(
+		_create_tool_def("fs_delete", "Deletes a file or directory", {
+			"path": {"type": "string", "description": "Path to delete"},
+			"recursive": {"type": "boolean", "default": false, "description": "Delete directory contents"}
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Path that was deleted"}
+			}
+		}),
+		tools._execute_delete
+	)
 
-
-func _create_write_file_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_WRITE_FILE,
-			"Writes content to a file",
-			{
-				"path": {"type": "string", "description": "File path"},
-				"content": {"type": "string", "description": "Content to write"},
-				"mode": {"type": "string", "enum": ["write", "append"], "default": "write"}
-			},
-			["path", "content"]
-		)
-	return MCPToolHandler.new(definition, _execute_write_file)
-
-
-func _create_delete_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_DELETE,
-			"Deletes a file or directory",
-			{
-				"path": {"type": "string", "description": "Path to delete"},
-				"recursive": {"type": "boolean", "default": false, "description": "Delete directory contents"}
-			},
-			["path"]
-		)
-	return MCPToolHandler.new(definition, _execute_delete)
-
-
-func _create_copy_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_COPY,
-			"Copies a file",
-			{
+	registry.register_tool(
+		_create_tool_def("fs_copy", "Copies a file", {
+			"source": {"type": "string", "description": "Source file path"},
+			"destination": {"type": "string", "description": "Destination file path"}
+		}, ["source", "destination"], {
+			"type": "object",
+			"properties": {
 				"source": {"type": "string", "description": "Source file path"},
 				"destination": {"type": "string", "description": "Destination file path"}
-			},
-			["source", "destination"]
-		)
-	return MCPToolHandler.new(definition, _execute_copy)
+			}
+		}),
+		tools._execute_copy
+	)
 
-
-func _create_move_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_MOVE,
-			"Moves or renames a file",
-			{
+	registry.register_tool(
+		_create_tool_def("fs_move", "Moves or renames a file", {
+			"source": {"type": "string", "description": "Source file path"},
+			"destination": {"type": "string", "description": "Destination file path"}
+		}, ["source", "destination"], {
+			"type": "object",
+			"properties": {
 				"source": {"type": "string", "description": "Source file path"},
 				"destination": {"type": "string", "description": "Destination file path"}
-			},
-			["source", "destination"]
-		)
-	return MCPToolHandler.new(definition, _execute_move)
+			}
+		}),
+		tools._execute_move
+	)
+
+	return tools
 
 
 # --- Tool Implementations ---
 
-func _execute_list_dir(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "res://")
-	var recursive: bool = params.get("recursive", false)
-	var filter_pattern: String = params.get("filter", "")
+func _execute_list_dir(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "res://")
+	var recursive: bool = args.get("recursive", false)
+	var filter_pattern: String = args.get("filter", "")
 
 	# Validate path
 	if not DirAccess.dir_exists_absolute(path):
-		return MCPToolResult.error("Directory not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Directory not found: %s" % path}], "isError": true}
 
 	var directories: Array[String] = []
 	var files: Array[Dictionary] = []
 
 	_list_dir_recursive(path, recursive, filter_pattern, directories, files)
 
-	return MCPToolResult.text(
-		"Found %d files and %d directories in %s" % [files.size(), directories.size(), path],
-		{
-			"path": path,
-			"directories": directories,
-			"files": files
-		}
-	)
+	return MCPToolRegistry.create_response("Found %d files and %d directories in %s" % [files.size(), directories.size(), path], {
+		"path": path,
+		"directories": directories,
+		"files": files
+	})
 
 
 func _list_dir_recursive(
@@ -175,19 +171,19 @@ func _list_dir_recursive(
 	dir.list_dir_end()
 
 
-func _execute_read_file(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
-	var start_line: int = params.get("start_line", 1)
-	var end_line: int = params.get("end_line", -1)
+func _execute_read_file(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
+	var start_line: int = args.get("start_line", 1)
+	var end_line: int = args.get("end_line", -1)
 
 	# Validate path
 	if not FileAccess.file_exists(path):
-		return MCPToolResult.error("File not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: File not found: %s" % path}], "isError": true}
 
 	# Read file
 	var content: String = FileAccess.get_file_as_string(path)
 	if content.is_empty() and FileAccess.get_open_error() != OK:
-		return MCPToolResult.error("Failed to read file: %s" % path, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to read file: %s" % path}], "isError": true}
 
 	# Handle line range
 	if start_line > 1 or end_line > 0:
@@ -206,21 +202,21 @@ func _execute_read_file(params: Dictionary) -> MCPToolResult:
 			selected_lines.append(lines[i])
 		content = "\n".join(selected_lines)
 
-	return MCPToolResult.text("Read file: %s" % path, {
+	return MCPToolRegistry.create_response("Read file: %s" % path, {
 		"path": path,
 		"content": content,
 		"line_count": content.split("\n").size()
 	})
 
 
-func _execute_write_file(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
-	var content: String = params.get("content", "")
-	var mode: String = params.get("mode", "write")
+func _execute_write_file(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
+	var content: String = args.get("content", "")
+	var mode: String = args.get("mode", "write")
 
 	# Validate path
 	if not path.begins_with("res://"):
-		return MCPToolResult.error("Invalid path: must start with res://", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Invalid path: must start with res://"}], "isError": true}
 
 	# Open file
 	var file_mode: FileAccess.ModeFlags = FileAccess.WRITE if mode == "write" else FileAccess.READ_WRITE
@@ -233,7 +229,7 @@ func _execute_write_file(params: Dictionary) -> MCPToolResult:
 		file = FileAccess.open(path, FileAccess.WRITE)
 
 		if file == null:
-			return MCPToolResult.error("Failed to create file: %s" % path, MCPError.Code.TOOL_EXECUTION_ERROR)
+			return {"content": [{"type": "text", "text": "Error: Failed to create file: %s" % path}], "isError": true}
 
 	# Write content
 	if mode == "append":
@@ -241,28 +237,24 @@ func _execute_write_file(params: Dictionary) -> MCPToolResult:
 	file.store_string(content)
 	file.close()
 
-	_logger.info("File written", {"path": path, "mode": mode, "bytes": content.length()})
-
-	return MCPToolResult.text("File written: %s" % path, {
+	return MCPToolRegistry.create_response("File written: %s" % path, {
 		"path": path,
 		"mode": mode,
 		"bytes_written": content.length()
 	})
 
 
-func _execute_delete(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
-	var recursive: bool = params.get("recursive", false)
+func _execute_delete(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
+	var recursive: bool = args.get("recursive", false)
 
 	# Validate path
 	if not path.begins_with("res://"):
-		return MCPToolResult.error("Invalid path: must start with res://", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Invalid path: must start with res://"}], "isError": true}
 
 	var err: Error
 	if DirAccess.dir_exists_absolute(path):
 		if recursive:
-			err = DirAccess.make_dir_recursive_absolute(path)  # This won't work, need different approach
-			# Actually delete recursively
 			err = _delete_directory_recursive(path)
 		else:
 			err = DirAccess.remove_absolute(path)
@@ -270,10 +262,11 @@ func _execute_delete(params: Dictionary) -> MCPToolResult:
 		err = DirAccess.remove_absolute(path)
 
 	if err != OK:
-		return MCPToolResult.error("Failed to delete: %s (error: %d)" % [path, err], MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to delete: %s (error: %d)" % [path, err]}], "isError": true}
 
-	_logger.info("Deleted", {"path": path, "recursive": recursive})
-	return MCPToolResult.text("Deleted: %s" % path, {"path": path})
+	return MCPToolRegistry.create_response("Deleted: %s" % path, {
+		"path": path
+	})
 
 
 func _delete_directory_recursive(path: String) -> Error:
@@ -303,38 +296,37 @@ func _delete_directory_recursive(path: String) -> Error:
 	return DirAccess.remove_absolute(path)
 
 
-func _execute_copy(params: Dictionary) -> MCPToolResult:
-	var source: String = params.get("source", "")
-	var destination: String = params.get("destination", "")
+func _execute_copy(args: Dictionary) -> Dictionary:
+	var source: String = args.get("source", "")
+	var destination: String = args.get("destination", "")
 
 	# Validate paths
 	if not source.begins_with("res://") or not destination.begins_with("res://"):
-		return MCPToolResult.error("Invalid path: must start with res://", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Invalid path: must start with res://"}], "isError": true}
 
 	if not FileAccess.file_exists(source):
-		return MCPToolResult.error("Source file not found: %s" % source, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Source file not found: %s" % source}], "isError": true}
 
 	var err: Error = DirAccess.copy_absolute(source, destination)
 	if err != OK:
-		return MCPToolResult.error("Failed to copy file (error: %d)" % err, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to copy file (error: %d)" % err}], "isError": true}
 
-	_logger.info("File copied", {"source": source, "destination": destination})
-	return MCPToolResult.text("Copied: %s -> %s" % [source, destination], {
+	return MCPToolRegistry.create_response("Copied: %s -> %s" % [source, destination], {
 		"source": source,
 		"destination": destination
 	})
 
 
-func _execute_move(params: Dictionary) -> MCPToolResult:
-	var source: String = params.get("source", "")
-	var destination: String = params.get("destination", "")
+func _execute_move(args: Dictionary) -> Dictionary:
+	var source: String = args.get("source", "")
+	var destination: String = args.get("destination", "")
 
 	# Validate paths
 	if not source.begins_with("res://") or not destination.begins_with("res://"):
-		return MCPToolResult.error("Invalid path: must start with res://", MCPError.Code.INVALID_PARAMS)
+		return {"content": [{"type": "text", "text": "Error: Invalid path: must start with res://"}], "isError": true}
 
 	if not FileAccess.file_exists(source) and not DirAccess.dir_exists_absolute(source):
-		return MCPToolResult.error("Source not found: %s" % source, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Source not found: %s" % source}], "isError": true}
 
 	var err: Error
 
@@ -350,10 +342,9 @@ func _execute_move(params: Dictionary) -> MCPToolResult:
 		err = DirAccess.rename_absolute(source, destination)
 
 	if err != OK:
-		return MCPToolResult.error("Failed to move (error: %d)" % err, MCPError.Code.TOOL_EXECUTION_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Failed to move (error: %d)" % err}], "isError": true}
 
-	_logger.info("File moved", {"source": source, "destination": destination})
-	return MCPToolResult.text("Moved: %s -> %s" % [source, destination], {
+	return MCPToolRegistry.create_response("Moved: %s -> %s" % [source, destination], {
 		"source": source,
 		"destination": destination
 	})
@@ -385,3 +376,17 @@ func _get_file_size(path: String) -> int:
 	var size: int = file.get_length()
 	file.close()
 	return size
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	var tool_def: Dictionary = {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

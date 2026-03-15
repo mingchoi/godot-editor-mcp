@@ -3,127 +3,126 @@
 extends RefCounted
 class_name RuntimeQueryTools
 
-const TOOL_GET_NODE := "runtime_get_node"
-const TOOL_GET_PROPERTY := "runtime_get_property"
-const TOOL_SET_PROPERTY := "runtime_set_property"
-const TOOL_CALL_METHOD := "runtime_call_method"
-const TOOL_GET_PERFORMANCE := "runtime_get_performance"
-const TOOL_LIST_CHILDREN := "runtime_list_children"
-const TOOL_GET_NODE_TREE := "runtime_get_node_tree"
-
-var _logger: MCPLogger
-var _editor_interface: EditorInterface
-
-
-func _init(logger: MCPLogger = null, editor_interface: EditorInterface = null) -> void:
-	_logger = logger.child("RuntimeQueryTools") if logger else MCPLogger.new("[RuntimeQueryTools]")
-	_editor_interface = editor_interface
-
+const MCPToolRegistry = preload("res://addons/mcp_server/tool_registry.gd")
 
 ## Registers all runtime query tools
-func register_all(registry: ToolRegistry) -> void:
-	registry.register(_create_get_node_tool())
-	registry.register(_create_get_property_tool())
-	registry.register(_create_set_property_tool())
-	registry.register(_create_call_method_tool())
-	registry.register(_create_get_performance_tool())
-	registry.register(_create_list_children_tool())
-	registry.register(_create_get_node_tree_tool())
+## Returns the tool instance to prevent garbage collection
+static func register(registry: RefCounted) -> RefCounted:
+	var tools := RuntimeQueryTools.new()
 
-
-func _create_get_node_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_GET_NODE,
-			"Gets a node from the running scene tree",
-			{
-				"path": {"type": "string", "description": "Node path in the running scene"}
-			},
-			["path"]
-		)
-	return MCPToolHandler.new(definition, _execute_get_node)
-
-
-func _create_get_property_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_GET_PROPERTY,
-			"Gets a property from a runtime node",
-			{
+	registry.register_tool(
+		_create_tool_def("runtime_get_node", "Gets a node from the running scene tree", {
+			"path": {"type": "string", "description": "Node path in the running scene"}
+		}, ["path"], {
+			"type": "object",
+			"properties": {
 				"path": {"type": "string", "description": "Node path"},
-				"property": {"type": "string", "description": "Property name"}
-			},
-			["path", "property"]
-		)
-	return MCPToolHandler.new(definition, _execute_get_property)
-
-
-func _create_set_property_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_SET_PROPERTY,
-			"Sets a property value on a node in the running game",
-			{
-				"path": {"type": "string", "description": "Node path in the running scene"},
-				"property": {"type": "string", "description": "Property name to set"},
-				"value": {"description": "New property value (JSON-compatible)"}
-			},
-			["path", "property", "value"]
-		)
-	return MCPToolHandler.new(definition, _execute_set_property)
-
-
-func _create_call_method_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_CALL_METHOD,
-			"Calls a method on a runtime node",
-			{
+				"name": {"type": "string", "description": "Node name"},
+				"type": {"type": "string", "description": "Godot class name"},
+				"valid": {"type": "boolean", "description": "Whether node is valid"},
+				"child_count": {"type": "integer", "description": "Number of children"},
+				"children": {"type": "array", "items": {"type": "string"}, "description": "Child node names"},
+				"script": {"type": "string", "description": "Script resource path if attached"}
+			}
+		}),
+		tools._execute_get_node
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_get_property", "Gets a property from a runtime node", {
+			"path": {"type": "string", "description": "Node path"},
+			"property": {"type": "string", "description": "Property name"}
+		}, ["path", "property"], {
+			"type": "object",
+			"properties": {
 				"path": {"type": "string", "description": "Node path"},
-				"method": {"type": "string", "description": "Method name to call"},
-				"args": {"type": "array", "default": [], "description": "Arguments to pass to the method"}
-			},
-			["path", "method"]
-		)
-	return MCPToolHandler.new(definition, _execute_call_method)
+				"property": {"type": "string", "description": "Property name"},
+				"value": {"description": "Property value"},
+				"type": {"type": "integer", "description": "Godot type enum value"}
+			}
+		}),
+		tools._execute_get_property
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_set_property", "Sets a property value on a node in the running game", {
+			"path": {"type": "string", "description": "Node path in the running scene"},
+			"property": {"type": "string", "description": "Property name to set"},
+			"value": {"description": "New property value (JSON-compatible)"}
+		}, ["path", "property", "value"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"property": {"type": "string", "description": "Property name"},
+				"old_value": {"description": "Previous value"},
+				"new_value": {"description": "New value"}
+			}
+		}),
+		tools._execute_set_property
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_call_method", "Calls a method on a runtime node", {
+			"path": {"type": "string", "description": "Node path"},
+			"method": {"type": "string", "description": "Method name to call"},
+			"args": {"type": "array", "default": [], "description": "Arguments to pass to the method"}
+		}, ["path", "method"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"method": {"type": "string", "description": "Method name"},
+				"result": {"description": "Method return value"},
+				"success": {"type": "boolean", "description": "Whether call succeeded"}
+			}
+		}),
+		tools._execute_call_method
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_get_performance", "Gets performance statistics", {}, [], {
+			"type": "object",
+			"properties": {
+				"fps": {"type": "number", "description": "Current frames per second"},
+				"fps_min": {"type": "number", "description": "Minimum FPS (not tracked)"},
+				"fps_max": {"type": "number", "description": "Maximum FPS (not tracked)"},
+				"memory_static": {"type": "number", "description": "Static memory usage in bytes"},
+				"draw_calls": {"type": "number", "description": "Total draw calls in frame"},
+				"objects": {"type": "number", "description": "Total object count"},
+				"nodes": {"type": "number", "description": "Node count"}
+			}
+		}),
+		tools._execute_get_performance
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_list_children", "Lists children of a node in the running game", {
+			"path": {"type": "string", "description": "Node path in the running scene"},
+			"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
+		}, ["path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Parent node path"},
+				"children": {"type": "array", "items": {"type": "object"}, "description": "Array of child node info"},
+				"count": {"type": "integer", "description": "Number of children"}
+			}
+		}),
+		tools._execute_list_children
+	)
+	registry.register_tool(
+		_create_tool_def("runtime_get_node_tree", "Returns the complete node hierarchy tree of the running game", {
+			"root_path": {
+				"type": "string",
+				"default": "",
+				"description": "Starting node path (defaults to scene tree root)"
+			}
+		}, [], {
+			"type": "object",
+			"properties": {
+				"root": {"type": "object", "description": "Root node with nested children hierarchy"}
+			}
+		}),
+		tools._execute_get_node_tree
+	)
+
+	return tools
 
 
-func _create_get_performance_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_GET_PERFORMANCE,
-			"Gets performance statistics",
-			{},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_get_performance)
-
-
-func _create_list_children_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_LIST_CHILDREN,
-			"Lists children of a node in the running game",
-			{
-				"path": {"type": "string", "description": "Node path in the running scene"},
-				"recursive": {"type": "boolean", "default": false, "description": "Include all descendants"}
-			},
-			["path"]
-		)
-	return MCPToolHandler.new(definition, _execute_list_children)
-
-
-func _create_get_node_tree_tool() -> MCPToolHandler:
-	var definition := MCPToolDefinition.create(
-			TOOL_GET_NODE_TREE,
-			"Returns the complete node hierarchy tree of the running game",
-			{
-				"root_path": {
-					"type": "string",
-					"default": "",
-					"description": "Starting node path (defaults to scene tree root)"
-				}
-			},
-			[]
-		)
-	return MCPToolHandler.new(definition, _execute_get_node_tree)
-
-
-# --- Tool Implementations ---
+# --- Helper Methods ---
 
 func _get_tree() -> SceneTree:
 	return Engine.get_main_loop() as SceneTree
@@ -140,12 +139,14 @@ func _resolve_node(path: String) -> Node:
 	return tree.root.get_node_or_null(path)
 
 
-func _execute_get_node(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
+# --- Tool Implementations ---
+
+func _execute_get_node(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	var children: Array[String] = []
 	for child: Node in node.get_children():
@@ -163,20 +164,20 @@ func _execute_get_node(params: Dictionary) -> MCPToolResult:
 	if node.get_script() != null:
 		data["script"] = node.get_script().resource_path
 
-	return MCPToolResult.text("Node: %s (%s)" % [node.name, node.get_class()], data)
+	return MCPToolRegistry.create_response("Node: %s (%s)" % [node.name, node.get_class()], data)
 
 
-func _execute_get_property(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
-	var property: String = params.get("property", "")
+func _execute_get_property(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
+	var property: String = args.get("property", "")
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	# Check if property exists
 	if not property in node:
-		return MCPToolResult.error("Property not found: %s" % property, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Property not found: %s" % property}], "isError": true}
 
 	var value: Variant = node.get(property)
 	var value_type: int = typeof(value)
@@ -188,13 +189,13 @@ func _execute_get_property(params: Dictionary) -> MCPToolResult:
 		"type": value_type
 	}
 
-	return MCPToolResult.text("%s: %s" % [property, str(value)], data)
+	return MCPToolRegistry.create_response("%s: %s" % [property, str(value)], data)
 
 
-func _execute_set_property(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
-	var property: String = params.get("property", "")
-	var raw_value: Variant = params.get("value")
+func _execute_set_property(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
+	var property: String = args.get("property", "")
+	var raw_value: Variant = args.get("value")
 
 	# Parse JSON string if necessary (MCP may send objects as JSON strings)
 	if typeof(raw_value) == TYPE_STRING:
@@ -204,7 +205,7 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	# Check if property exists and get its type info
 	var property_list: Array = node.get_property_list()
@@ -217,23 +218,14 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 			expected_type = prop["type"]
 			property_usage = prop.get("usage", PROPERTY_USAGE_DEFAULT)
 			property_found = true
-			_logger.info("Found property type", {
-				"property": property,
-				"type": expected_type,
-				"type_name": type_string(expected_type),
-				"usage": property_usage
-			})
 			break
 
 	if not property_found:
-		return MCPToolResult.error("Property not found: %s" % property, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Property not found: %s" % property}], "isError": true}
 
 	# Check for read-only property
 	if (property_usage & PROPERTY_USAGE_READ_ONLY) != 0:
-		return MCPToolResult.error(
-			"Property '%s' is read-only and cannot be modified" % property,
-			MCPError.Code.INVALID_PARAMS
-		)
+		return {"content": [{"type": "text", "text": "Error: Property '%s' is read-only and cannot be modified" % property}], "isError": true}
 
 	# Convert the value to the expected type
 	var value: Variant = _json_to_variant(raw_value, expected_type)
@@ -244,14 +236,7 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 	# Set the property
 	node.set(property, value)
 
-	_logger.info("Property set", {
-		"path": path,
-		"property": property,
-		"old": old_value,
-		"new": value
-	})
-
-	return MCPToolResult.text("Set %s = %s" % [property, str(value)], {
+	return MCPToolRegistry.create_response("Set %s = %s" % [property, str(value)], {
 		"path": path,
 		"property": property,
 		"old_value": _variant_to_json(old_value),
@@ -259,37 +244,30 @@ func _execute_set_property(params: Dictionary) -> MCPToolResult:
 	})
 
 
-func _execute_call_method(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
-	var method: String = params.get("method", "")
-	var args: Array = params.get("args", [])
+func _execute_call_method(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
+	var method: String = args.get("method", "")
+	var args_array: Array = args.get("args", [])
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	# Check if method exists
 	if not node.has_method(method):
-		return MCPToolResult.error("Method not found: %s" % method, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Method not found: %s" % method}], "isError": true}
 
 	# Call the method - GDScript doesn't have try/catch, so we use callv which returns the result
 	# If the method call fails, Godot will push an error but we can't catch it
 	var result: Variant
-	var call_ok: bool = true
 
 	# Validate arguments are serializable before calling
-	if args == null:
-		args = []
+	if args_array == null:
+		args_array = []
 
-	result = node.callv(method, args)
+	result = node.callv(method, args_array)
 
-	# Note: In GDScript, there's no exception handling.
-	# If the call fails, Godot will log an error and result may be null.
-	# We check the result validity based on context.
-
-	_logger.info("Method called", {"path": path, "method": method, "args": args.size()})
-
-	return MCPToolResult.text("Called %s" % method, {
+	return MCPToolRegistry.create_response("Called %s" % method, {
 		"path": path,
 		"method": method,
 		"result": _variant_to_json(result),
@@ -297,7 +275,7 @@ func _execute_call_method(params: Dictionary) -> MCPToolResult:
 	})
 
 
-func _execute_get_performance(_params: Dictionary = {}) -> MCPToolResult:
+func _execute_get_performance(_args: Dictionary = {}) -> Dictionary:
 	var data: Dictionary = {
 		"fps": Performance.get_monitor(Performance.TIME_FPS),
 		"fps_min": 0,  # Would need tracking
@@ -314,32 +292,32 @@ func _execute_get_performance(_params: Dictionary = {}) -> MCPToolResult:
 		data.draw_calls
 	]
 
-	return MCPToolResult.text(text, data)
+	return MCPToolRegistry.create_response(text, data)
 
 
-func _execute_list_children(params: Dictionary) -> MCPToolResult:
-	var path: String = params.get("path", "")
-	var recursive: bool = params.get("recursive", false)
+func _execute_list_children(args: Dictionary) -> Dictionary:
+	var path: String = args.get("path", "")
+	var recursive: bool = args.get("recursive", false)
 
 	var node: Node = _resolve_node(path)
 	if node == null:
-		return MCPToolResult.error("Node not found: %s" % path, MCPError.Code.NOT_FOUND)
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
 
 	var children: Array[Dictionary] = _get_children_list(node, recursive)
 
-	return MCPToolResult.text("Found %d children" % children.size(), {
+	return MCPToolRegistry.create_response("Found %d children" % children.size(), {
 		"path": str(node.get_path()),
 		"children": children,
 		"count": children.size()
 	})
 
 
-func _execute_get_node_tree(params: Dictionary) -> MCPToolResult:
+func _execute_get_node_tree(args: Dictionary) -> Dictionary:
 	var tree: SceneTree = _get_tree()
 	if tree == null:
-		return MCPToolResult.error("Game not running", MCPError.Code.INTERNAL_ERROR)
+		return {"content": [{"type": "text", "text": "Error: Game not running"}], "isError": true}
 
-	var root_path: String = params.get("root_path", "")
+	var root_path: String = args.get("root_path", "")
 	var root: Node
 
 	if root_path.is_empty():
@@ -347,13 +325,12 @@ func _execute_get_node_tree(params: Dictionary) -> MCPToolResult:
 	else:
 		root = _resolve_node(root_path)
 		if root == null:
-			return MCPToolResult.error("Node not found: %s" % root_path, MCPError.Code.NOT_FOUND)
+			return {"content": [{"type": "text", "text": "Error: Node not found: %s" % root_path}], "isError": true}
 
 	var tree_data: Dictionary = _build_runtime_tree(root)
 	var tree_text: String = _format_tree_text(tree_data, "")
 
-	_logger.info("Runtime node tree retrieved", {"root_path": root_path})
-	return MCPToolResult.text("Runtime scene tree:\n%s" % tree_text, {
+	return MCPToolRegistry.create_response("Runtime scene tree:\n%s" % tree_text, {
 		"root": tree_data
 	})
 
@@ -515,3 +492,17 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 				return arr
 
 	return value
+
+
+static func _create_tool_def(name: String, desc: String, props: Dictionary, required: Array, output_schema: Dictionary = {}) -> Dictionary:
+	var schema: Dictionary = {"type": "object", "properties": props}
+	if not required.is_empty():
+		schema["required"] = required
+	var tool_def: Dictionary = {
+		"name": name,
+		"description": desc,
+		"inputSchema": schema
+	}
+	if not output_schema.is_empty():
+		tool_def["outputSchema"] = output_schema
+	return tool_def

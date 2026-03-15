@@ -1,0 +1,880 @@
+{
+  "hierarchy": [
+    {
+      "name": "AnimationMixer",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "AudioStreamPlayer",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "CPUParticles3D",
+      "configuration_warnings": "PackedStringArray warnings = GeometryInstance3D::get_configuration_warnings();\n\nbool mesh_found = false;\nbool anim_material_found = false;\n\nif (get_mesh().is_valid()) {\n\tmesh_found = true;\n\tfor (int j = 0; j < get_mesh()->get_surface_count(); j++) {\n\t\tanim_material_found = Object::cast_to<ShaderMaterial>(get_mesh()->surface_get_material(j).ptr()) != nullptr;\n\t\tStandardMaterial3D *spat = Object::cast_to<StandardMaterial3D>(get_mesh()->surface_get_material(j).ptr());\n\t\tanim_material_found = anim_material_found || (spat && spat->get_billboard_mode() == StandardMaterial3D::BILLBOARD_PARTICLES);\n\t}\n}\n\nanim_material_found = anim_material_found || Object::cast_to<ShaderMaterial>(get_material_override().ptr()) != nullptr;\nStandardMaterial3D *spat = Object::cast_to<StandardMaterial3D>(get_material_override().ptr());\nanim_material_found = anim_material_found || (spat && spat->get_billboard_mode() == StandardMaterial3D::BILLBOARD_PARTICLES);\n\nif (!mesh_found) {\n\twarnings.push_back(RTR(\"Nothing is visible because no mesh has been assigned.\"));\n}\n\nif (!anim_material_found && (get_param_max(PARAM_ANIM_SPEED) != 0.0 || get_param_max(PARAM_ANIM_OFFSET) != 0.0 || get_param_curve(PARAM_ANIM_SPEED).is_valid() || get_param_curve(PARAM_ANIM_OFFSET).is_valid())) {\n\twarnings.push_back(RTR(\"CPUParticles3D animation requires the usage of a StandardMaterial3D whose Billboard Mode is set to \\\"Particle Billboard\\\".\"));\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "CSGShape3D",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\nconst CSGShape3D *current_shape = this;\nwhile (current_shape) {\n\tif (!current_shape->brush || current_shape->brush->faces.is_empty()) {\n\t\twarnings.push_back(RTR(\"The CSGShape3D has an empty shape.\\nCSGShape3D empty shapes typically occur because the mesh is not manifold.\\nA manifold mesh forms a solid object without gaps, holes, or loose edges.\\nEach edge must be a member of exactly two faces.\"));\n\t\tbreak;\n\t}\n\tcurrent_shape = current_shape->parent_shape;\n}\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "CanvasItem",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\n\nif (clip_children_mode != CLIP_CHILDREN_DISABLED && is_inside_tree()) {\n\tbool warned_about_ancestor_clipping = false;\n\tbool warned_about_canvasgroup_ancestor = false;\n\tNode *n = get_parent();\n\twhile (n) {\n\t\tCanvasItem *as_canvas_item = Object::cast_to<CanvasItem>(n);\n\t\tif (!warned_about_ancestor_clipping && as_canvas_item && as_canvas_item->clip_children_mode != CLIP_CHILDREN_DISABLED) {\n\t\t\twarnings.push_back(vformat(RTR(\"Ancestor \\\"%s\\\" clips its children, so this node will not be able to clip its children.\"), as_canvas_item->get_name()));\n\t\t\twarned_about_ancestor_clipping = true;\n\t\t}\n\n\t\tCanvasGroup *as_canvas_group = Object::cast_to<CanvasGroup>(n);\n\t\tif (!warned_about_canvasgroup_ancestor && as_canvas_group) {\n\t\t\twarnings.push_back(vformat(RTR(\"Ancestor \\\"%s\\\" is a CanvasGroup, so this node will not be able to clip its children.\"), as_canvas_group->get_name()));\n\t\t\twarned_about_canvasgroup_ancestor = true;\n\t\t}\n\n\t\t// Only break out early once both warnings have been triggered, so\n\t\t// that the user is aware of both possible reasons for clipping not working.\n\t\tif (warned_about_ancestor_clipping && warned_about_canvasgroup_ancestor) {\n\t\t\tbreak;\n\t\t}\n\t\tn = n->get_parent();\n\t}\n}\n\nreturn warnings;",
+      "children": [
+        {
+          "name": "Control",
+          "configuration_warnings": "ERR_READ_THREAD_GUARD_V(PackedStringArray());\nPackedStringArray warnings = CanvasItem::get_configuration_warnings();\n\nif (data.mouse_filter == MOUSE_FILTER_IGNORE && !data.tooltip.is_empty()) {\n\twarnings.push_back(RTR(\"The Hint Tooltip won't be displayed as the control's Mouse Filter is set to \\\"Ignore\\\". To solve this, set the Mouse Filter to \\\"Stop\\\" or \\\"Pass\\\".\"));\n}\n\nreturn warnings;",
+          "children": [
+            {
+              "name": "BaseButton",
+              "configuration_warnings": "PackedStringArray warnings = Control::get_configuration_warnings();\n\nif (get_button_group().is_valid() && !is_toggle_mode()) {\n\twarnings.push_back(RTR(\"ButtonGroup is intended to be used only with buttons that have toggle_mode set to true.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "ColorRect",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Container",
+              "configuration_warnings": "PackedStringArray warnings = Control::get_configuration_warnings();\n\nif (get_class() == \"Container\" && get_script().is_null()) {\n\twarnings.push_back(RTR(\"Container by itself serves no purpose unless a script configures its children placement behavior.\\nIf you don't intend to add a script, use a plain Control node instead.\"));\n}\n\nreturn warnings;",
+              "children": [
+                {
+                  "name": "AspectRatioContainer",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "CenterContainer",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "GraphElement",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "GridContainer",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "MarginContainer",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "PanelContainer",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "ScrollContainer",
+                  "configuration_warnings": "PackedStringArray warnings = Container::get_configuration_warnings();\n\nint found = 0;\n\nfor (int i = 0; i < get_child_count(); i++) {\n\tControl *c = as_sortable_control(get_child(i), SortableVisibilityMode::VISIBLE);\n\tif (!c || c == h_scroll || c == v_scroll || c == focus_panel || c == scroll_hint_top_left || c == scroll_hint_bottom_right) {\n\t\tcontinue;\n\t}\n\n\tfound++;\n}\n\nif (found != 1) {\n\twarnings.push_back(RTR(\"ScrollContainer is intended to work with a single child control.\\nUse a container as child (VBox, HBox, etc.), or a Control and set the custom minimum size manually.\"));\n}\n\nreturn warnings;",
+                  "children": []
+                },
+                {
+                  "name": "SubViewportContainer",
+                  "configuration_warnings": "PackedStringArray warnings = Container::get_configuration_warnings();\n\nbool has_viewport = false;\nfor (int i = 0; i < get_child_count(); i++) {\n\tif (Object::cast_to<SubViewport>(get_child(i))) {\n\t\thas_viewport = true;\n\t\tbreak;\n\t}\n}\nif (!has_viewport) {\n\twarnings.push_back(RTR(\"This node doesn't have a SubViewport as child, so it can't display its intended content.\\nConsider adding a SubViewport as a child to provide something displayable.\"));\n}\n\nif (get_default_cursor_shape() != Control::CURSOR_ARROW) {\n\twarnings.push_back(RTR(\"The default mouse cursor shape of SubViewportContainer has no effect.\\nConsider leaving it at its initial value `CURSOR_ARROW`.\"));\n}\n\nreturn warnings;",
+                  "children": []
+                },
+                {
+                  "name": "TabContainer",
+                  "configuration_warnings": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "GraphEditFilter",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "ItemList",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Label",
+              "configuration_warnings": "PackedStringArray warnings = Control::get_configuration_warnings();\n\n// FIXME: This is not ideal and the sizing model should be fixed,\n// but for now we have to warn about this impossible to resolve combination.\n// See GH-83546.\nif (is_inside_tree() && get_tree()->get_edited_scene_root() != this) {\n\t// If the Label happens to be the root node of the edited scene, we don't need\n\t// to check what its parent is. It's going to be some node from the editor tree\n\t// and it can be a container, but that makes no difference to the user.\n\tContainer *parent_container = Object::cast_to<Container>(get_parent_control());\n\tif (parent_container && autowrap_mode != TextServer::AUTOWRAP_OFF && get_custom_minimum_size() == Size2()) {\n\t\twarnings.push_back(RTR(\"Labels with autowrapping enabled must have a custom minimum size configured to work correctly inside a container.\"));\n\t}\n}\n\n// Ensure that the font can render all of the required glyphs.\nRef<Font> font;\nif (settings.is_valid()) {\n\tfont = settings->get_font();\n}\nif (font.is_null()) {\n\tfont = theme_cache.font;\n}\n\nif (font.is_valid()) {\n\t_ensure_shaped();\n\n\tfor (const Paragraph &para : paragraphs) {\n\t\tconst Glyph *glyph = TS->shaped_text_get_glyphs(para.text_rid);\n\t\tint64_t glyph_count = TS->shaped_text_get_glyph_count(para.text_rid);\n\t\tfor (int64_t i = 0; i < glyph_count; i++) {\n\t\t\tif (glyph[i].font_rid == RID() && glyph[i].index != 0) {\n\t\t\t\twarnings.push_back(RTR(\"The current font does not support rendering one or more characters used in this Label's text.\"));\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n}\n\nRef<FontFile> ff = font;\nif (ff.is_valid() && ff->is_multichannel_signed_distance_field()) {\n\tbool has_settings = settings.is_valid();\n\tint font_size = settings.is_valid() ? settings->get_font_size() : theme_cache.font_size;\n\tint outline_size = has_settings ? settings->get_outline_size() : theme_cache.font_outline_size;\n\tVector<LabelSettings::StackedOutlineData> stacked_outline_datas = has_settings ? settings->get_stacked_outline_data() : Vector<LabelSettings::StackedOutlineData>();\n\tVector<LabelSettings::StackedShadowData> stacked_shadow_datas = has_settings ? settings->get_stacked_shadow_data() : Vector<LabelSettings::StackedShadowData>();\n\tint max_outline_draw_size = outline_size;\n\tif (stacked_outline_datas.size() != 0) {\n\t\tint draw_iterations = stacked_outline_datas.size();\n\t\tfor (int j = 0; j < draw_iterations; j++) {\n\t\t\tint stacked_outline_size = stacked_outline_datas[j].size;\n\t\t\tif (stacked_outline_size <= 0) {\n\t\t\t\tcontinue;\n\t\t\t}\n\t\t\tmax_outline_draw_size += stacked_outline_size;\n\t\t}\n\t}\n\tif (stacked_shadow_datas.size() != 0) {\n\t\tint draw_iterations = stacked_shadow_datas.size();\n\t\tfor (int j = 0; j < draw_iterations; j++) {\n\t\t\tLabelSettings::StackedShadowData stacked_shadow_data = stacked_shadow_datas[j];\n\t\t\tif (stacked_shadow_data.outline_size > 0) {\n\t\t\t\tmax_outline_draw_size = MAX(max_outline_draw_size, stacked_shadow_data.outline_size);\n\t\t\t}\n\t\t}\n\t}\n\tfloat scale = (float)font_size / (float)ff->get_msdf_size();\n\tfloat ol = (float)max_outline_draw_size / scale / 4.0;\n\tfloat pxr = (float)ff->get_msdf_pixel_range() / 2.0 - 1.0;\n\tfloat r_pxr = (ol + 1.0) * 2.0;\n\n\tif (ol > pxr) {\n\t\twarnings.push_back(vformat(RTR(\"MSDF font pixel range is too small, some outlines/shadows will not render. Set MSDF pixel range to be at least %d to render all outlines/shadows.\"), Math::ceil(r_pxr)));\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "LineEdit",
+              "configuration_warnings": "PackedStringArray warnings = Control::get_configuration_warnings();\nif (secret_character.length() > 1) {\n\twarnings.push_back(\"Secret Character property supports only one character. Extra characters will be ignored.\");\n}\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "MenuBar",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "NinePatchRect",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Panel",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Range",
+              "configuration_warnings": "PackedStringArray warnings = Control::get_configuration_warnings();\n\nif (shared->exp_ratio && shared->min < 0) {\n\twarnings.push_back(RTR(\"If \\\"Exp Edit\\\" is enabled, \\\"Min Value\\\" must be greater or equal to 0.\"));\n}\n\nreturn warnings;",
+              "children": [
+                {
+                  "name": "ProgressBar",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "SpinBox",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "TextureProgressBar",
+                  "configuration_warnings": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "ReferenceRect",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "RichTextLabel",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Separator",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "SplitContainerMultiDragger",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "TabBar",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "TextEdit",
+              "configuration_warnings": null,
+              "children": [
+                {
+                  "name": "CodeEdit",
+                  "configuration_warnings": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "TextureRect",
+              "configuration_warnings": "PackedStringArray warnings = Control::get_configuration_warnings();\n\nif (stretch_mode == STRETCH_TILE) {\n\tRef<AtlasTexture> at = texture;\n\twhile (at.is_valid()) {\n\t\tif (at->get_margin() != Rect2()) {\n\t\t\twarnings.push_back(vformat(RTR(\"STRETCH_TILE mode is not supported for an AtlasTexture with non-zero margin.\")));\n\t\t\tbreak;\n\t\t}\n\t\tat = at->get_atlas();\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "Tree",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "VideoStreamPlayer",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "VirtualJoystick",
+              "configuration_warnings": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "Node2D",
+          "configuration_warnings": null,
+          "children": [
+            {
+              "name": "AnimatedSprite2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\nif (frames.is_null()) {\n\twarnings.push_back(RTR(\"A SpriteFrames resource must be created or set in the \\\"Sprite Frames\\\" property in order for AnimatedSprite2D to display frames.\"));\n}\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "AudioListener2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "AudioStreamPlayer2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "BackBufferCopy",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Bone2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\nif (!skeleton) {\n\tif (parent_bone) {\n\t\twarnings.push_back(RTR(\"This Bone2D chain should end at a Skeleton2D node.\"));\n\t} else {\n\t\twarnings.push_back(RTR(\"A Bone2D only works with a Skeleton2D or another Bone2D as parent node.\"));\n\t}\n}\n\nif (rest == Transform2D(0, 0, 0, 0, 0, 0)) {\n\twarnings.push_back(RTR(\"This bone lacks a proper REST pose. Go to the Skeleton2D node and set one.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "Camera2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "CanvasGroup",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (is_inside_tree()) {\n\tbool warned_about_ancestor_clipping = false;\n\tbool warned_about_canvasgroup_ancestor = false;\n\tNode *n = get_parent();\n\twhile (n) {\n\t\tCanvasItem *as_canvas_item = Object::cast_to<CanvasItem>(n);\n\t\tif (!warned_about_ancestor_clipping && as_canvas_item && as_canvas_item->get_clip_children_mode() != CLIP_CHILDREN_DISABLED) {\n\t\t\twarnings.push_back(vformat(RTR(\"Ancestor \\\"%s\\\" clips its children, so this CanvasGroup will not function properly.\"), as_canvas_item->get_name()));\n\t\t\twarned_about_ancestor_clipping = true;\n\t\t}\n\n\t\tCanvasGroup *as_canvas_group = Object::cast_to<CanvasGroup>(n);\n\t\tif (!warned_about_canvasgroup_ancestor && as_canvas_group) {\n\t\t\twarnings.push_back(vformat(RTR(\"Ancestor \\\"%s\\\" is a CanvasGroup, so this CanvasGroup will not function properly.\"), as_canvas_group->get_name()));\n\t\t\twarned_about_canvasgroup_ancestor = true;\n\t\t}\n\n\t\t// Only break out early once both warnings have been triggered, so\n\t\t// that the user is aware of both possible reasons for clipping not working.\n\t\tif (warned_about_ancestor_clipping && warned_about_canvasgroup_ancestor) {\n\t\t\tbreak;\n\t\t}\n\t\tn = n->get_parent();\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "CanvasModulate",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (is_in_canvas && is_visible_in_tree()) {\n\tVector<Node *> nodes = get_tree()->get_nodes_in_group(\"_canvas_modulate_\" + itos(get_canvas().get_id()));\n\n\tif (nodes.size() > 1) {\n\t\twarnings.push_back(RTR(\"Only one visible CanvasModulate is allowed per canvas.\\nWhen there are more than one, only one of them will be active. Which one is undefined.\"));\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "CollisionObject2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (shapes.is_empty()) {\n\twarnings.push_back(RTR(\"This node has no shape, so it can't collide or interact with other objects.\\nConsider adding a CollisionShape2D or CollisionPolygon2D as a child to define its shape.\"));\n}\n\nreturn warnings;",
+              "children": [
+                {
+                  "name": "Area2D",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "PhysicsBody2D",
+                  "configuration_warnings": "PackedStringArray warnings = CollisionObject2D::get_configuration_warnings();\n\nif (SceneTree::is_fti_enabled_in_project() && !is_physics_interpolated()) {\n\twarnings.push_back(RTR(\"PhysicsBody2D will not work correctly on a non-interpolated branch of the SceneTree.\\nCheck the node's inherited physics_interpolation_mode.\"));\n}\n\nreturn warnings;",
+                  "children": [
+                    {
+                      "name": "CharacterBody2D",
+                      "configuration_warnings": null,
+                      "children": []
+                    },
+                    {
+                      "name": "RigidBody2D",
+                      "configuration_warnings": "Transform2D t = get_transform();\n\nPackedStringArray warnings = PhysicsBody2D::get_configuration_warnings();\n\nif (Math::abs(t.columns[0].length() - 1.0) > 0.05 || Math::abs(t.columns[1].length() - 1.0) > 0.05) {\n\twarnings.push_back(RTR(\"Size changes to RigidBody2D will be overridden by the physics engine when running.\\nChange the size in children collision shapes instead.\"));\n}\n\nreturn warnings;",
+                      "children": [
+                        {
+                          "name": "PhysicalBone2D",
+                          "configuration_warnings": "PackedStringArray warnings = RigidBody2D::get_configuration_warnings();\n\nif (!parent_skeleton) {\n\twarnings.push_back(RTR(\"A PhysicalBone2D only works with a Skeleton2D or another PhysicalBone2D as a parent node!\"));\n}\nif (parent_skeleton && bone2d_index <= -1) {\n\twarnings.push_back(RTR(\"A PhysicalBone2D needs to be assigned to a Bone2D node in order to function! Please set a Bone2D node in the inspector.\"));\n}\nif (!child_joint) {\n\tPhysicalBone2D *parent_bone = Object::cast_to<PhysicalBone2D>(get_parent());\n\tif (parent_bone) {\n\t\twarnings.push_back(RTR(\"A PhysicalBone2D node should have a Joint2D-based child node to keep bones connected! Please add a Joint2D-based node as a child to this node!\"));\n\t}\n}\n\nreturn warnings;",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "StaticBody2D",
+                      "configuration_warnings": null,
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "CollisionPolygon2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (!Object::cast_to<CollisionObject2D>(get_parent())) {\n\twarnings.push_back(RTR(\"CollisionPolygon2D only serves to provide a collision shape to a CollisionObject2D derived node. Please only use it as a child of Area2D, StaticBody2D, RigidBody2D, CharacterBody2D, etc. to give them a shape.\"));\n}\n\nint polygon_count = polygon.size();\nif (polygon_count == 0) {\n\twarnings.push_back(RTR(\"An empty CollisionPolygon2D has no effect on collision.\"));\n} else {\n\tbool solids = build_mode == BUILD_SOLIDS;\n\tif (solids) {\n\t\tif (polygon_count < 3) {\n\t\t\twarnings.push_back(RTR(\"Invalid polygon. At least 3 points are needed in 'Solids' build mode.\"));\n\t\t}\n\t} else if (polygon_count < 2) {\n\t\twarnings.push_back(RTR(\"Invalid polygon. At least 2 points are needed in 'Segments' build mode.\"));\n\t}\n}\nif (one_way_collision && Object::cast_to<Area2D>(get_parent())) {\n\twarnings.push_back(RTR(\"The One Way Collision property will be ignored when the collision object is an Area2D.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "CollisionShape2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nCollisionObject2D *col_object = Object::cast_to<CollisionObject2D>(get_parent());\nif (col_object == nullptr) {\n\twarnings.push_back(RTR(\"CollisionShape2D only serves to provide a collision shape to a CollisionObject2D derived node.\\nPlease only use it as a child of Area2D, StaticBody2D, RigidBody2D, CharacterBody2D, etc. to give them a shape.\"));\n}\nif (shape.is_null()) {\n\twarnings.push_back(RTR(\"A shape must be provided for CollisionShape2D to function. Please create a shape resource for it!\"));\n}\nif (one_way_collision && Object::cast_to<Area2D>(col_object)) {\n\twarnings.push_back(RTR(\"The One Way Collision property will be ignored when the collision object is an Area2D.\"));\n}\n\nRef<ConvexPolygonShape2D> convex = shape;\nRef<ConcavePolygonShape2D> concave = shape;\nif (convex.is_valid() || concave.is_valid()) {\n\twarnings.push_back(RTR(\"The CollisionShape2D node has limited editing options for polygon-based shapes. Consider using a CollisionPolygon2D node instead.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "CPUParticles2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nCanvasItemMaterial *mat = Object::cast_to<CanvasItemMaterial>(get_material().ptr());\n\nif (get_material().is_null() || (mat && !mat->get_particles_animation())) {\n\tif (get_param_max(PARAM_ANIM_SPEED) != 0.0 || get_param_max(PARAM_ANIM_OFFSET) != 0.0 ||\n\t\t\tget_param_curve(PARAM_ANIM_SPEED).is_valid() || get_param_curve(PARAM_ANIM_OFFSET).is_valid()) {\n\t\twarnings.push_back(RTR(\"CPUParticles2D animation requires the usage of a CanvasItemMaterial with \\\"Particles Animation\\\" enabled.\"));\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "GPUParticles2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (process_material.is_null()) {\n\twarnings.push_back(RTR(\"A material to process the particles is not assigned, so no behavior is imprinted.\"));\n} else {\n\tCanvasItemMaterial *mat = Object::cast_to<CanvasItemMaterial>(get_material().ptr());\n\n\tif (get_material().is_null() || (mat && !mat->get_particles_animation())) {\n\t\tconst ParticleProcessMaterial *process = Object::cast_to<ParticleProcessMaterial>(process_material.ptr());\n\t\tif (process &&\n\t\t\t\t(process->get_param_max(ParticleProcessMaterial::PARAM_ANIM_SPEED) != 0.0 || process->get_param_max(ParticleProcessMaterial::PARAM_ANIM_OFFSET) != 0.0 ||\n\t\t\t\t\t\tprocess->get_param_texture(ParticleProcessMaterial::PARAM_ANIM_SPEED).is_valid() || process->get_param_texture(ParticleProcessMaterial::PARAM_ANIM_OFFSET).is_valid())) {\n\t\t\twarnings.push_back(RTR(\"Particles2D animation requires the usage of a CanvasItemMaterial with \\\"Particles Animation\\\" enabled.\"));\n\t\t}\n\t}\n}\n\nif (trail_enabled && (OS::get_singleton()->get_current_rendering_method() == \"gl_compatibility\" || OS::get_singleton()->get_current_rendering_method() == \"dummy\")) {\n\twarnings.push_back(RTR(\"Particle trails are only available when using the Forward+ or Mobile renderer.\"));\n}\n\nif (sub_emitter != NodePath() && (OS::get_singleton()->get_current_rendering_method() == \"gl_compatibility\" || OS::get_singleton()->get_current_rendering_method() == \"dummy\")) {\n\twarnings.push_back(RTR(\"Particle sub-emitters are not available when using the Compatibility renderer.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "Joint2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (!warning.is_empty()) {\n\twarnings.push_back(warning);\n}\n\nreturn warnings;",
+              "children": [
+                {
+                  "name": "DampedSpringJoint2D",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "GrooveJoint2D",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "PinJoint2D",
+                  "configuration_warnings": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "Light2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "LightOccluder2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (occluder_polygon.is_null()) {\n\twarnings.push_back(RTR(\"An occluder polygon must be set (or drawn) for this occluder to take effect.\"));\n}\n\nif (occluder_polygon.is_valid() && occluder_polygon->get_polygon().is_empty()) {\n\twarnings.push_back(RTR(\"The occluder polygon for this occluder is empty. Please draw a polygon.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "Line2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Marker2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "MeshInstance2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\nif (mesh.is_null()) {\n\twarnings.push_back(RTR(\"MeshInstance2D requires a Mesh to render anything. Please add a mesh resource for it!\"));\n}\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "MultiMeshInstance2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "NavigationLink2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (start_position.is_equal_approx(end_position)) {\n\twarnings.push_back(RTR(\"NavigationLink2D start position should be different than the end position to be useful.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "NavigationObstacle2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nconst Vector2 global_scale = get_global_scale();\nif (global_scale.x < 0.001 || global_scale.y < 0.001) {\n\twarnings.push_back(RTR(\"NavigationObstacle2D does not support negative or zero scaling.\"));\n}\n\nif (radius > 0.0 && !get_global_transform().is_conformal()) {\n\twarnings.push_back(RTR(\"The agent radius can only be scaled uniformly. The largest value along the two axes of the global scale will be used to scale the radius. This value may change in unexpected ways when the node is rotated.\"));\n}\n\nif (radius > 0.0 && get_global_skew() != 0.0) {\n\twarnings.push_back(RTR(\"Skew has no effect on the agent radius.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "NavigationRegion2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (is_visible_in_tree() && is_inside_tree()) {\n\tif (navigation_polygon.is_null()) {\n\t\twarnings.push_back(RTR(\"A NavigationPolygon resource must be set or created for this node to work. Please set a property or draw a polygon.\"));\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "Parallax2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "ParallaxLayer",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (!Object::cast_to<ParallaxBackground>(get_parent())) {\n\twarnings.push_back(RTR(\"ParallaxLayer node only works when set as child of a ParallaxBackground node.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "Path2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Polygon2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "RayCast2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "RemoteTransform2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (!has_node(remote_node) || !Object::cast_to<Node2D>(get_node(remote_node))) {\n\twarnings.push_back(RTR(\"Path property must point to a valid Node2D node to work.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "ShapeCast2D",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nif (shape.is_null()) {\n\twarnings.push_back(RTR(\"This node cannot interact with other objects unless a Shape2D is assigned.\"));\n}\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "Sprite2D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "TileMap",
+              "configuration_warnings": "PackedStringArray warnings = Node2D::get_configuration_warnings();\n\nwarnings.push_back(RTR(\"The TileMap node is deprecated as it is superseded by the use of multiple TileMapLayer nodes.\\nTo convert a TileMap to a set of TileMapLayer nodes, open the TileMap bottom panel with this node selected, click the toolbox icon in the top-right corner and choose \\\"Extract TileMap layers as individual TileMapLayer nodes\\\".\"));\n\n// Retrieve the set of Z index values with a Y-sorted layer.\nRBSet<int> y_sorted_z_index;\nfor (const TileMapLayer *layer : layers) {\n\tif (layer->is_y_sort_enabled()) {\n\t\ty_sorted_z_index.insert(layer->get_z_index());\n\t}\n}\n\n// Check if we have a non-sorted layer in a Z-index with a Y-sorted layer.\nfor (const TileMapLayer *layer : layers) {\n\tif (!layer->is_y_sort_enabled() && y_sorted_z_index.has(layer->get_z_index())) {\n\t\twarnings.push_back(RTR(\"A Y-sorted layer has the same Z-index value as a not Y-sorted layer.\\nThis may lead to unwanted behaviors, as a layer that is not Y-sorted will be Y-sorted as a whole with tiles from Y-sorted layers.\"));\n\t\tbreak;\n\t}\n}\n\nif (!is_y_sort_enabled()) {\n\t// Check if Y-sort is enabled on a layer but not on the node.\n\tfor (const TileMapLayer *layer : layers) {\n\t\tif (layer->is_y_sort_enabled()) {\n\t\t\twarnings.push_back(RTR(\"A TileMap layer is set as Y-sorted, but Y-sort is not enabled on the TileMap node itself.\"));\n\t\t\tbreak;\n\t\t}\n\t}\n} else {\n\t// Check if Y-sort is enabled on the node, but not on any of the layers.\n\tbool need_warning = true;\n\tfor (const TileMapLayer *layer : layers) {\n\t\tif (layer->is_y_sort_enabled()) {\n\t\t\tneed_warning = false;\n\t\t\tbreak;\n\t\t}\n\t}\n\tif (need_warning) {\n\t\twarnings.push_back(RTR(\"The TileMap node is set as Y-sorted, but Y-sort is not enabled on any of the TileMap's layers.\\nThis may lead to unwanted behaviors, as a layer that is not Y-sorted will be Y-sorted as a whole.\"));\n\t}\n}\n\n// Check if we are in isometric mode without Y-sort enabled.\nif (tile_set.is_valid() && tile_set->get_tile_shape() == TileSet::TILE_SHAPE_ISOMETRIC) {\n\tbool warn = !is_y_sort_enabled();\n\tif (!warn) {\n\t\tfor (const TileMapLayer *layer : layers) {\n\t\t\tif (!layer->is_y_sort_enabled()) {\n\t\t\t\twarn = true;\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\tif (warn) {\n\t\twarnings.push_back(RTR(\"Isometric TileSet will likely not look as intended without Y-sort enabled for the TileMap and all of its layers.\"));\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "TileMapLayer",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "TouchScreenButton",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "VisibleOnScreenNotifier2D",
+              "configuration_warnings": null,
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CanvasLayer",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "CheckBox",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "CheckButton",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "ColorPickerButton",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "GPUParticles3D",
+      "configuration_warnings": "PackedStringArray warnings = GeometryInstance3D::get_configuration_warnings();\n\nbool meshes_found = false;\nbool anim_material_found = false;\n\nfor (int i = 0; i < draw_passes.size(); i++) {\n\tif (draw_passes[i].is_valid()) {\n\t\tmeshes_found = true;\n\t\tfor (int j = 0; j < draw_passes[i]->get_surface_count(); j++) {\n\t\t\tanim_material_found = Object::cast_to<ShaderMaterial>(draw_passes[i]->surface_get_material(j).ptr()) != nullptr;\n\t\t\tBaseMaterial3D *spat = Object::cast_to<BaseMaterial3D>(draw_passes[i]->surface_get_material(j).ptr());\n\t\t\tanim_material_found = anim_material_found || (spat && spat->get_billboard_mode() == StandardMaterial3D::BILLBOARD_PARTICLES);\n\t\t}\n\t\tif (anim_material_found) {\n\t\t\tbreak;\n\t\t}\n\t}\n}\n\nanim_material_found = anim_material_found || Object::cast_to<ShaderMaterial>(get_material_override().ptr()) != nullptr;\n\tBaseMaterial3D *spat = Object::cast_to<BaseMaterial3D>(get_material_override().ptr());\n\tanim_material_found = anim_material_found || (spat && spat->get_billboard_mode() == BaseMaterial3D::BILLBOARD_PARTICLES);\n}\n\nif (!meshes_found) {\n\twarnings.push_back(RTR(\"Nothing is visible because meshes have not been assigned to draw passes.\"));\n}\n\nif (process_material.is_null()) {\n\twarnings.push_back(RTR(\"A material to process the particles is not assigned, so no behavior is imprinted.\"));\n} else {\n\tconst ParticleProcessMaterial *process = Object::cast_to<ParticleProcessMaterial>(process_material.ptr());\n\tif (!anim_material_found && process &&\n\t\t\t(process->get_param_max(ParticleProcessMaterial::PARAM_ANIM_SPEED) != 0.0 || process->get_param_max(ParticleProcessMaterial::PARAM_ANIM_OFFSET) != 0.0 ||\n\t\t\t\t\tprocess->get_param_texture(ParticleProcessMaterial::PARAM_ANIM_SPEED).is_valid() || process->get_param_texture(ParticleProcessMaterial::PARAM_ANIM_OFFSET).is_valid())) {\n\t\twarnings.push_back(RTR(\"Particles animation requires the usage of a BaseMaterial3D whose Billboard Mode is set to \\\"Particle Billboard\\\".\"));\n\t}\n}\n\nif (trail_enabled) {\n\tint dp_count = 0;\n\tbool missing_trails = false;\n\tbool no_materials = false;\n\n\tfor (int i = 0; i < draw_passes.size(); i++) {\n\t\tRef<Mesh> draw_pass = draw_passes[i];\n\t\tif (draw_pass.is_valid() && draw_pass->get_builtin_bind_pose_count() > 0) {\n\t\t\tdp_count++;\n\t\t}\n\n\t\tif (draw_pass.is_valid()) {\n\t\t\tint mats_found = 0;\n\t\t\tfor (int j = 0; j < draw_passes[i]->get_surface_count(); j++) {\n\t\t\t\tBaseMaterial3D *spat = Object::cast_to<BaseMaterial3D>(draw_passes[i]->surface_get_material(j).ptr());\n\t\t\t\tif (spat) {\n\t\t\t\t\tmats_found++;\n\t\t\t\t}\n\t\t\t\tif (spat && !spat->get_flag(BaseMaterial3D::FLAG_PARTICLE_TRAILS_MODE)) {\n\t\t\t\t\tmissing_trails = true;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tif (mats_found != draw_passes[i]->get_surface_count()) {\n\t\t\t\tno_materials = true;\n\t\t\t}\n\t\t}\n\t}\n\n\tBaseMaterial3D *spat = Object::cast_to<BaseMaterial3D>(get_material_override().ptr());\n\tif (spat) {\n\t\tno_materials = false;\n\t}\n\tif (spat && !spat->get_flag(BaseMaterial3D::FLAG_PARTICLE_TRAILS_MODE)) {\n\t\tmissing_trails = true;\n\t}\n\n\tif (dp_count && skin.is_valid()) {\n\t\twarnings.push_back(RTR(\"Using Trail meshes with a skin causes Skin to override Trail poses. Suggest removing the Skin.\"));\n\t} else if (dp_count == 0 && skin.is_null()) {\n\t\twarnings.push_back(RTR(\"Trails active, but neither Trail meshes or a Skin were found.\"));\n\t} else if (dp_count > 1) {\n\t\twarnings.push_back(RTR(\"Only one Trail mesh is supported. If you want to use more than a single mesh, a Skin is needed (see documentation).\"));\n\t}\n\n\tif ((dp_count || skin.is_valid()) && (missing_trails || no_materials)) {\n\t\twarnings.push_back(RTR(\"Trails enabled, but one or more mesh materials are either missing or not set for trails rendering.\"));\n\t}\n\tif (OS::get_singleton()->get_current_rendering_method() == \"gl_compatibility\" || OS::get_singleton()->get_current_rendering_method() == \"dummy\") {\n\t\twarnings.push_back(RTR(\"Particle trails are only available when using the Forward+ or Mobile renderer.\"));\n\t}\n}\n\nif (sub_emitter != NodePath() && (OS::get_singleton()->get_current_rendering_method() == \"gl_compatibility\" || OS::get_singleton()->get_current_rendering_method() == \"dummy\")) {\n\twarnings.push_back(RTR(\"Particle sub-emitters are only available when using the Forward+ or Mobile renderer.\"));\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "HTTPRequest",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "InstancePlaceholder",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "JointLimitationCone3D",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "Label3D",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "LightmapRaycasterEmbree",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "LightmapperRD",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "MenuButton",
+      "configuration_warnings": "PackedStringArray warnings = Button::get_configuration_warnings();\nwarnings.append_array(popup->get_configuration_warnings());\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "MeshInstance3D",
+      "configuration_warnings": "PackedStringArray warnings = GeometryInstance3D::get_configuration_warnings();\nif (mesh.is_null()) {\n\twarnings.push_back(RTR(\"MeshInstance3D requires a Mesh to render anything. Please add a mesh resource for it!\"));\n}\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "MissingNode",
+      "configuration_warnings": "// The mere existence of this node is warning.\nPackedStringArray warnings = Node::get_configuration_warnings();\nif (!original_scene.is_empty()) {\n\twarnings.push_back(vformat(RTR(\"This node was an instance of scene '%s', which was no longer available when this scene was loaded.\"), original_scene));\n\twarnings.push_back(vformat(RTR(\"Saving current scene will discard instance and all its properties, including editable children edits (if existing).\")));\n} else if (!original_class.is_empty()) {\n\twarnings.push_back(vformat(RTR(\"This node was saved as class type '%s', which was no longer available when this scene was loaded.\"), original_class));\n\twarnings.push_back(RTR(\"Data from the original node is kept as a placeholder until this type of node is available again. It can hence be safely re-saved without risk of data loss.\"));\n} else {\n\twarnings.push_back(RTR(\"Unrecognized missing node. Check scene dependency errors for details.\"));\n}\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "MultiMeshInstance3D",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "MultiplayerSynchronizer",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\n\nif (root_path.is_empty() || !has_node(root_path)) {\n\twarnings.push_back(RTR(\"A valid NodePath must be set in the \\\"Root Path\\\" property in order for MultiplayerSynchronizer to be able to synchronize properties.\"));\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "NavigationAgent2D",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\n\nif (!Object::cast_to<Node2D>(get_parent())) {\n\twarnings.push_back(RTR(\"The NavigationAgent2D can be used only under a Node2D inheriting parent node.\"));\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "NavigationAgent3D",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\n\nif (!Object::cast_to<Node3D>(get_parent())) {\n\twarnings.push_back(RTR(\"The NavigationAgent3D can be used only under a Node3D inheriting parent node.\"));\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "Node3D",
+      "configuration_warnings": null,
+      "children": [
+        {
+          "name": "AudioListener3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "AudioStreamPlayer3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "BoneAttachment3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (use_external_skeleton) {\n\tif (external_skeleton_node_cache.is_null()) {\n\t\twarnings.push_back(RTR(\"External Skeleton3D node not set! Please set a path to an external Skeleton3D node.\"));\n\t}\n} else {\n\tSkeleton3D *parent = Object::cast_to<Skeleton3D>(get_parent());\n\tif (!parent) {\n\t\twarnings.push_back(RTR(\"Parent node is not a Skeleton3D node! Please use an external Skeleton3D if you intend to use the BoneAttachment3D without it being a child of a Skeleton3D node.\"));\n\t}\n}\n\nif (bone_idx == -1) {\n\twarnings.push_back(RTR(\"BoneAttachment3D node is not bound to any bones! Please select a bone to attach this node.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "Camera3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "CollisionObject3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (shapes.is_empty()) {\n\twarnings.push_back(RTR(\"This node has no shape, so it can't collide or interact with other objects.\\nConsider adding a CollisionShape3D or CollisionPolygon3D as a child to define its shape.\"));\n}\n\nVector3 scale = get_transform().get_basis().get_scale();\nif (!(Math::is_zero_approx(scale.x - scale.y) && Math::is_zero_approx(scale.y - scale.z))) {\n\twarnings.push_back(RTR(\"With a non-uniform scale this node will probably not function as expected.\\nPlease make its scale uniform (i.e. the same on all axes), and change the size in children collision shapes instead.\"));\n}\n\nreturn warnings;",
+          "children": [
+            {
+              "name": "Area3D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "PhysicsBody3D",
+              "configuration_warnings": "PackedStringArray warnings = CollisionObject3D::get_configuration_warnings();\n\nif (SceneTree::is_fti_enabled_in_project() && !is_physics_interpolated()) {\n\twarnings.push_back(RTR(\"PhysicsBody3D will not work correctly on a non-interpolated branch of the SceneTree.\\nCheck the node's inherited physics_interpolation_mode.\"));\n}\n\nreturn warnings;",
+              "children": [
+                {
+                  "name": "CharacterBody3D",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "PhysicalBone3D",
+                  "configuration_warnings": null,
+                  "children": []
+                },
+                {
+                  "name": "RigidBody3D",
+                  "configuration_warnings": "PackedStringArray warnings = PhysicsBody3D::get_configuration_warnings();\n\nVector3 scale = get_transform().get_basis().get_scale();\nif (Math::abs(scale.x - 1.0) > 0.05 || Math::abs(scale.y - 1.0) > 0.05 || Math::abs(scale.z - 1.0) > 0.05) {\n\twarnings.push_back(RTR(\"Scale changes to RigidBody3D will be overridden by the physics engine when running.\\nPlease change the size in children collision shapes instead.\"));\n}\n\nreturn warnings;",
+                  "children": []
+                },
+                {
+                  "name": "StaticBody3D",
+                  "configuration_warnings": null,
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "CollisionPolygon3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (!Object::cast_to<CollisionObject3D>(get_parent())) {\n\twarnings.push_back(RTR(\"CollisionPolygon3D only serves to provide a collision shape to a CollisionObject3D derived node.\\nPlease only use it as a child of Area3D, StaticBody3D, RigidBody3D, CharacterBody3D, etc. to give them a shape.\"));\n}\n\nif (polygon.is_empty()) {\n\twarnings.push_back(RTR(\"An empty CollisionPolygon3D has no effect on collision.\"));\n}\n\nVector3 scale = get_transform().get_basis().get_scale();\nif (!(Math::is_zero_approx(scale.x - scale.y) && Math::is_zero_approx(scale.y - scale.z))) {\n\twarnings.push_back(RTR(\"A non-uniformly scaled CollisionPolygon3D node will probably not function as expected.\\nPlease make its scale uniform (i.e. the same on all axes), and change its polygon's vertices instead.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "CollisionShape3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nCollisionObject3D *col_object = Object::cast_to<CollisionObject3D>(get_parent());\nif (col_object == nullptr) {\n\twarnings.push_back(RTR(\"CollisionShape3D only serves to provide a collision shape to a CollisionObject3D derived node.\\nPlease only use it as a child of Area3D, StaticBody3D, RigidBody3D, CharacterBody3D, etc. to give them a shape.\"));\n}\n\nif (shape.is_null()) {\n\twarnings.push_back(RTR(\"A shape must be provided for CollisionShape3D to function. Please create a shape resource for it.\"));\n}\n\nif (shape.is_valid() && Object::cast_to<RigidBody3D>(col_object)) {\n\tString body_type = \"RigidBody3D\";\n\tif (Object::cast_to<VehicleBody3D>(col_object)) {\n\t\tbody_type = \"VehicleBody3D\";\n\t}\n\n\tif (Object::cast_to<ConcavePolygonShape3D>(*shape)) {\n\t\twarnings.push_back(vformat(RTR(\"When used for collision, ConcavePolygonShape3D is intended to work with static CollisionObject3D nodes like StaticBody3D.\\nIt will likely not behave well for %ss (except when frozen and freeze_mode set to FREEZE_MODE_STATIC).\"), body_type));\n\t} else if (Object::cast_to<WorldBoundaryShape3D>(*shape)) {\n\t\twarnings.push_back(RTR(\"WorldBoundaryShape3D doesn't support RigidBody3D in another mode than static.\"));\n\t}\n}\n\nif (shape.is_valid() && Object::cast_to<CharacterBody3D>(col_object)) {\n\tif (Object::cast_to<ConcavePolygonShape3D>(*shape)) {\n\t\twarnings.push_back(RTR(\"When used for collision, ConcavePolygonShape3D is intended to work with static CollisionObject3D nodes like StaticBody3D.\\nIt will likely not behave well for CharacterBody3Ds.\"));\n\t}\n}\n\nVector3 scale = get_transform().get_basis().get_scale();\nif (!(Math::is_zero_approx(scale.x - scale.y) && Math::is_zero_approx(scale.y - scale.z))) {\n\twarnings.push_back(RTR(\"A non-uniformly scaled CollisionShape3D node will probably not function as expected.\\nPlease make its scale uniform (i.e. the same on all axes), and change the size of its shape resource instead.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "GridMap",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "ImporterMeshInstance3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "Joint3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (!warning.is_empty()) {\n\twarnings.push_back(warning);\n}\n\nreturn warnings;",
+          "children": [
+            {
+              "name": "ConeTwistJoint3D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Generic6DOFJoint3D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "HingeJoint3D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "PinJoint3D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "SliderJoint3D",
+              "configuration_warnings": null,
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "LightmapProbe",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "Marker3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "NavigationLink3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (start_position.is_equal_approx(end_position)) {\n\twarnings.push_back(RTR(\"NavigationLink3D start position should be different than the end position to be useful.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "NavigationObstacle3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (get_global_rotation().x != 0.0 || get_global_rotation().z != 0.0) {\n\twarnings.push_back(RTR(\"NavigationObstacle3D only takes global rotation around the y-axis into account. Rotations around the x-axis or z-axis might lead to unexpected results.\"));\n}\n\nconst Vector3 global_scale = get_global_basis().get_scale();\nif (global_scale.x < 0.001 || global_scale.y < 0.001 || global_scale.z < 0.001) {\n\twarnings.push_back(RTR(\"NavigationObstacle3D does not support negative or zero scaling.\"));\n}\n\nif (radius > 0.0 && !get_global_basis().is_conformal()) {\n\twarnings.push_back(RTR(\"The agent radius can only be scaled uniformly. The largest scale value along the three axes will be used.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "NavigationRegion3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (is_visible_in_tree() && is_inside_tree()) {\n\tif (navigation_mesh.is_null()) {\n\t\twarnings.push_back(RTR(\"A NavigationMesh resource must be set or created for this node to work.\"));\n\t}\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "OpenXRCompositionLayer",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (!get_transform().basis.is_orthonormal()) {\n\twarnings.push_back(RTR(\"OpenXR composition layers must have orthonormalized transforms (ie. no scale or shearing).\"));\n}\n\nif (enable_hole_punch && get_sort_order() >= 0) {\n\twarnings.push_back(RTR(\"Hole punching won't work as expected unless the sort order is less than zero.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "OpenXRHand",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "OpenXRRenderModel",
+          "configuration_warnings": "PackedStringArray warnings;\n\nNode *parent = get_parent();\nif (!parent->is_class(\"XROrigin3D\") && !parent->is_class(\"OpenXRRenderModelManager\")) {\n\twarnings.push_back(\"This node must be a child of either a XROrigin3D or OpenXRRenderModelManager node!\");\n}\n\nif (!GLOBAL_GET(\"xr/openxr/extensions/render_model\")) {\n\twarnings.push_back(\"The render model extension is not enabled in project settings!\");\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "OpenXRRenderModelManager",
+          "configuration_warnings": "PackedStringArray warnings;\n\nXROrigin3D *parent = nullptr;\nif (tracker == 0 || tracker == 1) {\n\tif (!make_local_to_pose.is_empty()) {\n\t\twarnings.push_back(\"Must specify a tracker to make node local to pose.\");\n\t}\n\n\tparent = Object::cast_to<XROrigin3D>(get_parent());\n} else {\n\tNode *node = get_parent();\n\twhile (!parent && node) {\n\t\tparent = Object::cast_to<XROrigin3D>(node);\n\n\t\tnode = node->get_parent();\n\t}\n}\nif (!parent) {\n\twarnings.push_back(\"This node must be a child of an XROrigin3D node!\");\n}\n\nif (!GLOBAL_GET(\"xr/openxr/extensions/render_model\")) {\n\twarnings.push_back(\"The render model extension is not enabled in project settings!\");\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "Path3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "RayCast3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "RemoteTransform3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (!has_node(remote_node) || !Object::cast_to<Node3D>(get_node(remote_node))) {\n\twarnings.push_back(RTR(\"The \\\"Remote Path\\\" property must point to a valid Node3D or Node3D-derived node to work.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "ShapeCast3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (shape.is_null()) {\n\twarnings.push_back(RTR(\"This node cannot interact with other objects unless a Shape3D is assigned.\"));\n}\nif (shape.is_valid() && Object::cast_to<ConcavePolygonShape3D>(*shape)) {\n\twarnings.push_back(RTR(\"ShapeCast3D does not support ConcavePolygonShape3Ds. Collisions will not be reported.\"));\n}\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "Skeleton3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "SkeletonModifier3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\nif (skeleton_id.is_null()) {\n\twarnings.push_back(RTR(\"Skeleton3D node not set! SkeletonModifier3D must be child of Skeleton3D.\"));\n}\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "SpringArm3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "SpringBoneCollision3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nSpringBoneSimulator3D *parent = Object::cast_to<SpringBoneSimulator3D>(get_parent());\nif (!parent) {\n\twarnings.push_back(RTR(\"Parent node should be a SpringBoneSimulator3D node.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "VehicleWheel3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (!Object::cast_to<VehicleBody3D>(get_parent())) {\n\twarnings.push_back(RTR(\"VehicleWheel3D serves to provide a wheel system to a VehicleBody3D. Please use it as a child of a VehicleBody3D.\"));\n}\n\nreturn warnings;",
+          "children": []
+        },
+        {
+          "name": "VisualInstance3D",
+          "configuration_warnings": null,
+          "children": [
+            {
+              "name": "Decal",
+              "configuration_warnings": "PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();\n\nif (OS::get_singleton()->get_current_rendering_method() == \"gl_compatibility\" || OS::get_singleton()->get_current_rendering_method() == \"dummy\") {\n\twarnings.push_back(RTR(\"Decals are only available when using the Forward+ or Mobile renderer.\"));\n\treturn warnings;\n}\n\nif (textures[TEXTURE_ALBEDO].is_null() && textures[TEXTURE_NORMAL].is_null() && textures[TEXTURE_ORM].is_null() && textures[TEXTURE_EMISSION].is_null()) {\n\twarnings.push_back(RTR(\"The decal has no textures loaded into any of its texture properties, and will therefore not be visible.\"));\n}\n\nif ((textures[TEXTURE_NORMAL].is_valid() || textures[TEXTURE_ORM].is_valid()) && textures[TEXTURE_ALBEDO].is_null()) {\n\twarnings.push_back(RTR(\"The decal has a Normal and/or ORM texture, but no Albedo texture is set.\\nAn Albedo texture with an alpha channel is required to blend the normal/ORM maps onto the underlying surface.\\nIf you don't want the Albedo texture to be visible, set Albedo Mix to 0.\"));\n}\n\nif (cull_mask == 0) {\n\twarnings.push_back(RTR(\"The decal's Cull Mask has no bits enabled, which means the decal will not paint objects on any layer.\\nTo resolve this, enable at least one bit in the Cull Mask property.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "FogVolume",
+              "configuration_warnings": "PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();\n\nRef<Environment> environment = get_viewport()->find_world_3d()->get_environment();\n\nif (OS::get_singleton()->get_current_rendering_method() != \"forward_plus\") {\n\twarnings.push_back(RTR(\"Fog Volumes are only visible when using the Forward+ renderer.\"));\n\treturn warnings;\n}\n\nif (environment.is_valid() && !environment->is_volumetric_fog_enabled()) {\n\twarnings.push_back(RTR(\"Fog Volumes need volumetric fog to be enabled in the scene's Environment in order to be visible.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "GPUParticlesCollision3D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "Light3D",
+              "configuration_warnings": "PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();\n\nif (!get_scale().is_equal_approx(Vector3(1, 1, 1))) {\n\twarnings.push_back(RTR(\"A light's scale does not affect the visual size of the light.\"));\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "LightmapGI",
+              "configuration_warnings": "PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();\n\n#ifdef MODULE_LIGHTMAPPER_RD_ENABLED\nif (!DisplayServer::get_singleton()->can_create_rendering_device()) {\n\twarnings.push_back(vformat(RTR(\"Lightmaps can only be baked from a GPU that supports the RenderingDevice backends.\\nYour GPU (%s) does not support RenderingDevice, as it does not support Vulkan, Direct3D 12, or Metal.\\nLightmap baking will not be available on this device, although rendering existing baked lightmaps will work.\"), RenderingServer::get_singleton()->get_video_adapter_name()));\n\treturn warnings;\n}\n\nif (shadowmask_mode != LightmapGIData::SHADOWMASK_MODE_NONE && light_data.is_valid() && !light_data->has_shadowmask_textures()) {\n\twarnings.push_back(RTR(\"The lightmap has no baked shadowmask textures. Please rebake with the Shadowmask Mode set to anything other than None.\"));\n}\n\n#elif defined(ANDROID_ENABLED) || defined(APPLE_EMBEDDED_ENABLED)\nwarnings.push_back(vformat(RTR(\"Lightmaps cannot be baked on %s. Rendering existing baked lightmaps will still work.\"), OS::get_singleton()->get_name()));\n#else\nwarnings.push_back(RTR(\"Lightmaps cannot be baked, as the `lightmapper_rd` module was disabled at compile-time. Rendering existing baked lightmaps will still work.\"));\n#endif\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "OccluderInstance3D",
+              "configuration_warnings": "PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();\n\nif (!bool(GLOBAL_GET_CACHED(bool, \"rendering/occlusion_culling/use_occlusion_culling\"))) {\n\twarnings.push_back(RTR(\"Occlusion culling is disabled in the Project Settings, which means occlusion culling won't be performed in the root viewport.\\nTo resolve this, open the Project Settings and enable Rendering > Occlusion Culling > Use Occlusion Culling.\"));\n}\n\nif (bake_mask == 0) {\n\twarnings.push_back(RTR(\"The Bake Mask has no bits enabled, which means baking will not produce any occluder meshes for this OccluderInstance3D.\\nTo resolve this, enable at least one bit in the Bake Mask property.\"));\n}\n\nif (occluder.is_null()) {\n\twarnings.push_back(RTR(\"No occluder mesh is defined in the Occluder property, so no occlusion culling will be performed using this OccluderInstance3D.\\nTo resolve this, set the Occluder property to one of the primitive occluder types or bake the scene meshes by selecting the OccluderInstance3D and pressing the Bake Occluders button at the top of the 3D editor viewport.\"));\n} else {\n\tRef<ArrayOccluder3D> arr_occluder = occluder;\n\tif (arr_occluder.is_valid() && arr_occluder->get_indices().size() < 3) {\n\t\t// Setting a new ArrayOccluder3D from the inspector will create an empty occluder,\n\t\t// so warn the user about this.\n\t\twarnings.push_back(RTR(\"The occluder mesh has less than 3 vertices, so no occlusion culling will be performed using this OccluderInstance3D.\\nTo generate a proper occluder mesh, select the OccluderInstance3D then use the Bake Occluders button at the top of the 3D editor viewport.\"));\n\t}\n\tRef<PolygonOccluder3D> poly_occluder = occluder;\n\tif (poly_occluder.is_valid() && poly_occluder->get_polygon().size() < 3) {\n\t\twarnings.push_back(RTR(\"The polygon occluder has less than 3 vertices, so no occlusion culling will be performed using this OccluderInstance3D.\\nVertices can be added in the inspector or using the polygon editing tools at the top of the 3D editor viewport.\"));\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "OpenXRVisibilityMask",
+              "configuration_warnings": "PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();\n\nif (is_visible() && is_inside_tree()) {\n\tXRCamera3D *camera = Object::cast_to<XRCamera3D>(get_parent());\n\tif (camera == nullptr) {\n\t\twarnings.push_back(RTR(\"OpenXR visibility mask must have an XRCamera3D node as their parent.\"));\n\t}\n}\n\nreturn warnings;",
+              "children": []
+            },
+            {
+              "name": "ReflectionProbe",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "RootMotionView",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "VisibleOnScreenNotifier3D",
+              "configuration_warnings": null,
+              "children": []
+            },
+            {
+              "name": "VoxelGI",
+              "configuration_warnings": "PackedStringArray warnings = VisualInstance3D::get_configuration_warnings();\n\nif (OS::get_singleton()->get_current_rendering_method() == \"gl_compatibility\") {\n\twarnings.push_back(RTR(\"VoxelGI nodes are not supported when using the Compatibility renderer yet. Support will be added in a future release.\"));\n} else if (OS::get_singleton()->get_current_rendering_method() == \"dummy\") {\n\twarnings.push_back(RTR(\"VoxelGI nodes are not supported when using the Dummy renderer.\"));\n} else if (probe_data.is_null()) {\n\twarnings.push_back(RTR(\"No VoxelGI data set, so this node is disabled. Bake static objects to enable GI.\"));\n}\nreturn warnings;",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "XRFaceModifier3D",
+          "configuration_warnings": null,
+          "children": []
+        },
+        {
+          "name": "XRNode3D",
+          "configuration_warnings": "PackedStringArray warnings = Node3D::get_configuration_warnings();\n\nif (is_visible() && is_inside_tree()) {\n\t// Warn if the node has a parent which isn't an XROrigin3D!\n\tNode *parent = get_parent();\n\tXROrigin3D *origin = Object::cast_to<XROrigin3D>(parent);\n\tif (parent && origin == nullptr) {\n\t\twarnings.push_back(RTR(\"XRNode3D may not function as expected without an XROrigin3D node as its parent.\"));\n\t};\n\n\tif (tracker_name == \"\") {\n\t\twarnings.push_back(RTR(\"No tracker name is set.\"));\n\t}\n\n\tif (pose_name == \"\") {\n\t\twarnings.push_back(RTR(\"No pose is set.\"));\n\t}\n\n\tif (SceneTree::is_fti_enabled_in_project() && is_physics_interpolated()) {\n\t\twarnings.push_back(RTR(\"XRNode3D should have physics_interpolation_mode set to OFF in order to avoid jitter.\"));\n\t}\n}\n\nreturn warnings;",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "OptionButton",
+      "configuration_warnings": "PackedStringArray warnings = Button::get_configuration_warnings();\nwarnings.append_array(popup->get_configuration_warnings());\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "PopupMenu",
+      "configuration_warnings": "PackedStringArray warnings = Popup::get_configuration_warnings();\n\nif (!DisplayServer::get_singleton()->is_window_transparency_available() && !GLOBAL_GET_CACHED(bool, \"display/window/subwindows/embed_subwindows\")) {\n\tRef<StyleBoxFlat> sb = theme_cache.panel_style;\n\tif (sb.is_valid() && (sb->get_shadow_size() > 0 || sb->get_corner_radius(CORNER_TOP_LEFT) > 0 || sb->get_corner_radius(CORNER_TOP_RIGHT) > 0 || sb->get_corner_radius(CORNER_BOTTOM_LEFT) > 0 || sb->get_corner_radius(CORNER_BOTTOM_RIGHT) > 0)) {\n\t\twarnings.push_back(RTR(\"The current theme style has shadows and/or rounded corners for popups, but those won't display correctly if \\\"display/window/per_pixel_transparency/allowed\\\" isn't enabled in the Project Settings, nor if it isn't supported.\"));\n\t}\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "PopupPanel",
+      "configuration_warnings": "PackedStringArray warnings = Popup::get_configuration_warnings();\n\nif (!DisplayServer::get_singleton()->is_window_transparency_available() && !GLOBAL_GET_CACHED(bool, \"display/window/subwindows/embed_subwindows\")) {\n\tRef<StyleBoxFlat> sb = theme_cache.panel_style;\n\tif (sb.is_valid() && (sb->get_shadow_size() > 0 || sb->get_corner_radius(CORNER_TOP_LEFT) > 0 || sb->get_corner_radius(CORNER_TOP_RIGHT) > 0 || sb->get_corner_radius(CORNER_BOTTOM_LEFT) > 0 || sb->get_corner_radius(CORNER_BOTTOM_RIGHT) > 0)) {\n\t\twarnings.push_back(RTR(\"The current theme style has shadows and/or rounded corners for popups, but those won't display correctly if \\\"display/window/per_pixel_transparency/allowed\\\" isn't enabled in the Project Settings, nor if it isn't supported.\"));\n\t}\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "ResourcePreloader",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "ShaderGlobalsOverride",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\n\nif (!active) {\n\twarnings.push_back(RTR(\"ShaderGlobalsOverride is not active because another node of the same type is in the scene.\"));\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "SpriteBase3D",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "StatusIndicator",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "Timer",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\n\nif (wait_time < 0.05 - CMP_EPSILON) {\n\twarnings.push_back(RTR(\"Very low timer wait times (< 0.05 seconds) may behave in significantly different ways depending on the rendered or physics frame rate.\\nConsider using a script's process loop instead of relying on a Timer for very low wait times.\"));\n}\n\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "VBoxContainer",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "VFlowContainer",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "VScrollBar",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "VSlider",
+      "configuration_warnings": null,
+      "children": []
+    },
+    {
+      "name": "Viewport",
+      "configuration_warnings": "ERR_MAIN_THREAD_GUARD_V(PackedStringArray());\nPackedStringArray warnings = Node::get_configuration_warnings();\n\nif (size.x <= 1 || size.y <= 1) {\n\twarnings.push_back(RTR(\"The Viewport size must be greater than or equal to 2 pixels on both dimensions to render anything.\"));\n}\nreturn warnings;",
+      "children": []
+    },
+    {
+      "name": "WorldEnvironment",
+      "configuration_warnings": "PackedStringArray warnings = Node::get_configuration_warnings();\n\nif (environment.is_null() && camera_attributes.is_null()) {\n\twarnings.push_back(RTR(\"To have any visible effect, WorldEnvironment requires its \\\"Environment\\\" property to contain an Environment, its \\\"Camera Attributes\\\" property to contain a CameraAttributes resource, or both.\"));\n}\n\nif (!is_inside_tree()) {\n\treturn warnings;\n}\n\nif (environment.is_valid() && get_viewport()->find_world_3d()->get_environment() != environment) {\n\twarnings.push_back((\"Only the first Environment has an effect in a scene (or set of instantiated scenes).\"));\n}\n\nif (camera_attributes.is_valid() && get_viewport()->find_world_3d()->get_camera_attributes() != camera_attributes) {\n\twarnings.push_back(RTR(\"Only one WorldEnvironment is allowed per scene (or set of instantiated scenes).\"));\n}\n\nif (compositor.is_valid() && get_viewport()->find_world_3d()->get_compositor() != compositor) {\n\twarnings.push_back((\"Only the first Compositor has an effect in a scene (or set of instantiated scenes).\"));\n}\n\nreturn warnings;",
+      "children": []
+    }
+  ],
+  "stats": {
+    "total_classes": 171,
+    "with_warnings": 74,
+    "without_warnings": 97,
+    "root_count": 38
+  }
+}
