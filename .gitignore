@@ -52,6 +52,7 @@ coverage/
 
 # Node.js dependencies
 node_modules/
+package-lock.json
 
 # Godot project files
 .editorconfig
@@ -65,3 +66,7 @@ CLAUDE.md
 .specify/
 specs/
 prompts/
+
+# Temporary data files
+tmp/
+tmp/**
