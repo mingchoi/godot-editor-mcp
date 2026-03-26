@@ -54,13 +54,13 @@ shape = SubResource("BoxShape3D_sgp6g")
 mesh = SubResource("BoxMesh_o5qli")
 surface_material_override/0 = SubResource("StandardMaterial3D_sgp6g")
 
-[node name="Ball" type="RigidBody3D" parent="." unique_id=1885589362]
+[node name="Ball2" type="RigidBody3D" parent="." unique_id=1885589362]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.3, -2.5)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Ball" unique_id=969548739]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ball2" unique_id=969548739]
 shape = SubResource("SphereShape3D_0wfyh")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Ball" unique_id=1692331476]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ball2" unique_id=1692331476]
 mesh = SubResource("SphereMesh_sgp6g")
 surface_material_override/0 = SubResource("StandardMaterial3D_o5qli")
 

@@ -19,7 +19,7 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 
 	registry.register_tool(
 		_create_tool_def("node_get", "Gets detailed information about a node", {
-			"path": {"type": "string", "description": "Node path (e.g., 'Main/Player' or '/root/Main/Player')"},
+			"path": {"type": "string", "description": "Node path (e.g., '/' or '/Player')"},
 			"include_properties": {"type": "boolean", "default": false, "description": "Include all property values"},
 			"include_children": {"type": "boolean", "default": false, "description": "Include list of child node names"}
 		}, ["path"], {
@@ -158,14 +158,42 @@ func _resolve_node(path: String) -> Node:
 	if root == null:
 		return null
 
-	# Handle absolute paths
-	if path.begins_with("/root/"):
-		# Remove /root/ prefix and get from scene root
-		var relative_path: String = path.substr(6)
-		return root.get_node_or_null(relative_path)
+	# Handle empty path or just "/" - return root
+	if path.is_empty() or path == "/":
+		return root
+
+	# Strip leading "/" and treat as relative to scene root
+	if path.begins_with("/"):
+		path = path.substr(1)
 
 	# Handle relative paths from scene root
 	return root.get_node_or_null(path)
+
+
+## Convert a node's full path to scene-relative path.
+## Returns "/" for scene root, "/Child/Grandchild" for descendants.
+func _get_scene_relative_path(node: Node) -> String:
+	if node == null:
+		return ""
+
+	var root: Node = _editor_interface.get_edited_scene_root()
+	if root == null:
+		return str(node.get_path())
+
+	# If this is the root, return "/"
+	if node == root:
+		return "/"
+
+	# Check if node is a descendant of scene root
+	var root_path: String = str(root.get_path())
+	var node_path: String = str(node.get_path())
+
+	if node_path.begins_with(root_path + "/"):
+		# Extract relative path and prepend "/"
+		return "/" + node_path.substr(root_path.length() + 1)
+
+	# Node is not under scene root, return full path
+	return node_path
 
 
 func _execute_get(args: Dictionary) -> Dictionary:
@@ -300,10 +328,10 @@ func _execute_create(args: Dictionary) -> Dictionary:
 	parent.add_child(new_node)
 	new_node.owner = _editor_interface.get_edited_scene_root()
 
-	var full_path: String = "%s/%s" % [parent_path, new_node.name]
+	var scene_path: String = _get_scene_relative_path(new_node)
 
-	return MCPToolRegistry.create_response("Created node: %s" % full_path, {
-		"path": full_path,
+	return MCPToolRegistry.create_response("Created node: %s" % scene_path, {
+		"path": scene_path,
 		"name": new_node.name,
 		"type": node_type
 	})
@@ -377,11 +405,11 @@ func _execute_duplicate(args: Dictionary) -> Dictionary:
 		parent.add_child(duplicate)
 		duplicate.owner = _editor_interface.get_edited_scene_root()
 
-	var full_path: String = "%s/%s" % [parent.get_path(), new_name] if parent != null else new_name
+	var scene_path: String = _get_scene_relative_path(duplicate)
 
-	return MCPToolRegistry.create_response("Duplicated node: %s" % full_path, {
+	return MCPToolRegistry.create_response("Duplicated node: %s" % scene_path, {
 		"original_path": path,
-		"duplicate_path": full_path,
+		"duplicate_path": scene_path,
 		"name": new_name
 	})
 
@@ -485,7 +513,7 @@ func _execute_pack_as_scene(args: Dictionary) -> Dictionary:
 		"source_path": path,
 		"destination": destination,
 		"saved": true,
-		"instance_path": str(instance.get_path())
+		"instance_path": _get_scene_relative_path(instance)
 	})
 
 
@@ -494,7 +522,7 @@ func _get_children_list(node: Node, recursive: bool) -> Array[Dictionary]:
 
 	for child: Node in node.get_children():
 		result.append({
-			"path": str(child.get_path()),
+			"path": _get_scene_relative_path(child),
 			"name": child.name,
 			"type": child.get_class()
 		})
