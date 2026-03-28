@@ -1,0 +1,99 @@
+[gd_scene format=3 uid="uid://ctty5kj1dadrf"]
+
+[ext_resource type="Script" uid="uid://cxv3km7k2nx0t" path="res://scenes/minigolf/mini_golf.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://dod6ur0ag34lx" path="res://scenes/minigolf/golf_ball.gd" id="2_ball"]
+[ext_resource type="Script" uid="uid://c5vo63k0gi8es" path="res://scenes/minigolf/hole.gd" id="3_hole"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l62bb"]
+resource_local_to_scene = true
+albedo_color = Color(0.18, 0.55, 0.18, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4wfof"]
+resource_local_to_scene = true
+albedo_color = Color(0.55, 0.35, 0.17, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6h3e4"]
+resource_local_to_scene = true
+albedo_color = Color(0.55, 0.35, 0.17, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dot8k"]
+resource_local_to_scene = true
+albedo_color = Color(0.55, 0.35, 0.17, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1578s"]
+resource_local_to_scene = true
+albedo_color = Color(0.55, 0.35, 0.17, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8h3eg"]
+resource_local_to_scene = true
+roughness = 0.3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_856rr"]
+resource_local_to_scene = true
+albedo_color = Color(0.1, 0.1, 0.1, 1)
+roughness = 0.9
+
+[node name="MiniGolf" type="Node3D" unique_id=1081818671]
+script = ExtResource("1_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=182734737]
+transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 5, 10, 5)
+
+[node name="Course" type="Node3D" parent="." unique_id=731278466]
+
+[node name="Ground" type="CSGBox3D" parent="Course" unique_id=1296756097]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.25, 0)
+use_collision = true
+size = Vector3(12, 0.5, 8)
+material = SubResource("StandardMaterial3D_l62bb")
+
+[node name="WallNorth" type="CSGBox3D" parent="Course" unique_id=1624104523]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, -4)
+use_collision = true
+size = Vector3(12, 0.5, 0.2)
+material = SubResource("StandardMaterial3D_4wfof")
+
+[node name="WallSouth" type="CSGBox3D" parent="Course" unique_id=1325478416]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 4)
+use_collision = true
+size = Vector3(12, 0.5, 0.2)
+material = SubResource("StandardMaterial3D_6h3e4")
+
+[node name="WallEast" type="CSGBox3D" parent="Course" unique_id=1293720168]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.25, 0)
+use_collision = true
+size = Vector3(0.2, 0.5, 8)
+material = SubResource("StandardMaterial3D_dot8k")
+
+[node name="WallWest" type="CSGBox3D" parent="Course" unique_id=408843597]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.25, 0)
+use_collision = true
+size = Vector3(0.2, 0.5, 8)
+material = SubResource("StandardMaterial3D_1578s")
+
+[node name="Ball" type="Node3D" parent="." unique_id=2034082260]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.25, 0)
+script = ExtResource("2_ball")
+
+[node name="Sphere" type="CSGSphere3D" parent="Ball" unique_id=844732323]
+use_collision = true
+radius = 0.25
+material = SubResource("StandardMaterial3D_8h3eg")
+
+[node name="Hole" type="Node3D" parent="." unique_id=510970330]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 0)
+script = ExtResource("3_hole")
+
+[node name="Cylinder" type="CSGCylinder3D" parent="Hole" unique_id=2007497389]
+radius = 0.4
+height = 0.02
+material = SubResource("StandardMaterial3D_856rr")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1413401015]
+transform = Transform3D(1, 0, 0, 0, 0.76604444, 0.6427876, 0, -0.6427876, 0.76604444, -7, 6, 0)
+size = 12.0
