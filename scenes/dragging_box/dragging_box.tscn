@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://chw3uceyae8pj"]
+
+[ext_resource type="Script" uid="uid://4r5i43i8d6w7" path="res://scenes/dragging_box/dragging_box_color_box.gd" id="1_2brim"]
+[ext_resource type="Script" uid="uid://cst8etn6aln0x" path="res://scenes/dragging_box/dragging_box_hello_button.gd" id="2_rmtqo"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_rmtqo"]
+resource_local_to_scene = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_box"]
+albedo_color = Color(0.267, 0.533, 1, 1)
+roughness = 0.3
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5b4cl"]
+resource_local_to_scene = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.333, 0.333, 0.333, 1)
+roughness = 0.8
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_1d315"]
+resource_local_to_scene = true
+material = SubResource("StandardMaterial3D_floor")
+
+[node name="DraggingBox" type="Node3D" unique_id=813212838]
+
+[node name="Camera" type="Camera3D" parent="." unique_id=556880535]
+transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 5, 5)
+current = true
+
+[node name="Light" type="DirectionalLight3D" parent="." unique_id=1487566537]
+transform = Transform3D(0.8660254, -0.35355338, 0.35355338, 0, 0.70710677, 0.70710677, -0.5, -0.6123724, 0.6123724, 0, 0, 0)
+shadow_enabled = true
+
+[node name="ColorBox" type="Area3D" parent="." unique_id=612086189]
+script = ExtResource("1_2brim")
+
+[node name="Mesh" type="MeshInstance3D" parent="ColorBox" unique_id=1016503097]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_rmtqo")
+surface_material_override/0 = SubResource("StandardMaterial3D_box")
+
+[node name="Collision" type="CollisionShape3D" parent="ColorBox" unique_id=653818421]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_5b4cl")
+
+[node name="Floor" type="MeshInstance3D" parent="." unique_id=1847333707]
+transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("PlaneMesh_1d315")
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1713693005]
+
+[node name="HelloButton" type="Button" parent="UI" unique_id=1300891461]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 170.0
+offset_bottom = 60.0
+text = "Hello World"
+script = ExtResource("2_rmtqo")
