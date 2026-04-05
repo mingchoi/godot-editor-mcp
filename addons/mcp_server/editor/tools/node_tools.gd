@@ -145,6 +145,21 @@ static func register(registry: RefCounted, editor_interface: EditorInterface) ->
 		tools._execute_pack_as_scene
 	)
 
+	registry.register_tool(
+		_create_tool_def("node_set_script", "Attaches a GDScript to a node", {
+			"path": {"type": "string", "description": "Node path in the scene tree"},
+			"script_path": {"type": "string", "description": "Path to the script file (e.g., 'res://scripts/player.gd')"}
+		}, ["path", "script_path"], {
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Node path"},
+				"script_path": {"type": "string", "description": "Script file path attached"},
+				"previous_script": {"type": "string", "description": "Previous script path if any"}
+			}
+		}),
+		tools._execute_set_script
+	)
+
 	return tools
 
 
@@ -281,6 +296,8 @@ func _execute_set_property(args: Dictionary) -> Dictionary:
 			break
 
 	var value: Variant = _json_to_variant(raw_value, expected_type)
+	if value is Resource and value.resource_path.is_empty():
+		value.resource_local_to_scene = true
 	var old_value: Variant = node.get(property)
 	node.set(property, value)
 
@@ -289,6 +306,47 @@ func _execute_set_property(args: Dictionary) -> Dictionary:
 		"property": property,
 		"old_value": _variant_to_json(old_value),
 		"new_value": _variant_to_json(value)
+	})
+
+
+func _execute_set_script(args: Dictionary) -> Dictionary:
+	if _editor_interface == null:
+		return {"content": [{"type": "text", "text": "Error: Editor interface not available"}], "isError": true}
+
+	var path: String = args.get("path", "")
+	var script_path: String = args.get("script_path", "")
+
+	# Validate script file exists
+	if not FileAccess.file_exists(script_path):
+		return {"content": [{"type": "text", "text": "Error: Script file not found: %s" % script_path}], "isError": true}
+
+	# Validate script extension
+	if not script_path.ends_with(".gd") and not script_path.ends_with(".cs"):
+		return {"content": [{"type": "text", "text": "Error: Invalid script file: must be .gd or .cs"}], "isError": true}
+
+	# Resolve node
+	var node: Node = _resolve_node(path)
+	if node == null:
+		return {"content": [{"type": "text", "text": "Error: Node not found: %s" % path}], "isError": true}
+
+	# Load script
+	var script: Resource = ResourceLoader.load(script_path)
+	if script == null:
+		return {"content": [{"type": "text", "text": "Error: Failed to load script: %s" % script_path}], "isError": true}
+
+	# Record previous script
+	var previous_script: String = ""
+	var old_script: Script = node.get_script()
+	if old_script != null:
+		previous_script = old_script.resource_path
+
+	# Set script directly (undo/redo add_do_property does not apply values)
+	node.set("script", script)
+
+	return MCPToolRegistry.create_response("Attached script %s to %s" % [script_path, path], {
+		"path": path,
+		"script_path": script_path,
+		"previous_script": previous_script
 	})
 
 
@@ -320,9 +378,18 @@ func _execute_create(args: Dictionary) -> Dictionary:
 		node_name = node_type
 	new_node.name = node_name
 
-	# Set properties
+	# Set properties with type conversion
+	var property_list: Array = new_node.get_property_list()
 	for prop: String in properties:
-		new_node.set(prop, properties[prop])
+		var expected_type: int = TYPE_NIL
+		for prop_info: Dictionary in property_list:
+			if prop_info["name"] == prop:
+				expected_type = prop_info["type"]
+				break
+		var converted_value: Variant = _json_to_variant(properties[prop], expected_type)
+		if converted_value is Resource and converted_value.resource_path.is_empty():
+			converted_value.resource_local_to_scene = true
+		new_node.set(prop, converted_value)
 
 	# Add to parent
 	parent.add_child(new_node)
@@ -638,7 +705,39 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 										break
 								var converted_value: Variant = _json_to_variant(d[key], prop_type)
 								resource.set(key, converted_value)
+						if resource.resource_path.is_empty():
+							resource.resource_local_to_scene = true
 						return resource
+
+	# Load resource from string path for OBJECT properties
+	if typeof(value) == TYPE_STRING and expected_type == TYPE_OBJECT:
+		var path: String = value
+		if path.begins_with("res://") and ResourceLoader.exists(path):
+			var loaded: Resource = ResourceLoader.load(path)
+			if loaded != null:
+				return loaded
+		# Try instantiating as a resource class (e.g., "StandardMaterial3D", "SphereMesh")
+		elif ClassDB.class_exists(path) and ClassDB.can_instantiate(path):
+			var instance: Object = ClassDB.instantiate(path)
+			if instance is Resource:
+				return instance
+
+	# Convert space-separated strings to vector/color types
+	if typeof(value) == TYPE_STRING:
+		var parts: PackedStringArray = value.split(" ")
+		if expected_type == TYPE_VECTOR3 and parts.size() == 3:
+			return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
+		elif expected_type == TYPE_VECTOR3I and parts.size() == 3:
+			return Vector3i(int(parts[0]), int(parts[1]), int(parts[2]))
+		elif expected_type == TYPE_VECTOR2 and parts.size() == 2:
+			return Vector2(float(parts[0]), float(parts[1]))
+		elif expected_type == TYPE_VECTOR2I and parts.size() == 2:
+			return Vector2i(int(parts[0]), int(parts[1]))
+		elif expected_type == TYPE_COLOR:
+			if value.begins_with("#"):
+				return Color(value)
+			elif parts.size() >= 3:
+				return Color(float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]) if parts.size() >= 4 else 1.0)
 
 	# Convert array elements
 	if typeof(value) == TYPE_ARRAY:

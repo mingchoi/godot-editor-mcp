@@ -334,6 +334,36 @@ func _json_to_variant(value: Variant, expected_type: int) -> Variant:
 									resource.set(key, converted_value)
 							return resource
 
+
+	# Load resource from string path for OBJECT properties
+	if typeof(value) == TYPE_STRING and expected_type == TYPE_OBJECT:
+		var path: String = value
+		if path.begins_with("res://") and ResourceLoader.exists(path):
+			var loaded: Resource = ResourceLoader.load(path)
+			if loaded != null:
+				return loaded
+		# Try instantiating as a resource class (e.g., "StandardMaterial3D", "SphereMesh")
+		elif ClassDB.class_exists(path) and ClassDB.can_instantiate(path):
+			var instance: Object = ClassDB.instantiate(path)
+			if instance is Resource:
+				return instance
+
+	# Convert space-separated strings to vector/color types
+	if typeof(value) == TYPE_STRING:
+		var parts: PackedStringArray = value.split(" ")
+		if expected_type == TYPE_VECTOR3 and parts.size() == 3:
+			return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
+		elif expected_type == TYPE_VECTOR3I and parts.size() == 3:
+			return Vector3i(int(parts[0]), int(parts[1]), int(parts[2]))
+		elif expected_type == TYPE_VECTOR2 and parts.size() == 2:
+			return Vector2(float(parts[0]), float(parts[1]))
+		elif expected_type == TYPE_VECTOR2I and parts.size() == 2:
+			return Vector2i(int(parts[0]), int(parts[1]))
+		elif expected_type == TYPE_COLOR:
+			if value.begins_with("#"):
+				return Color(value)
+			elif parts.size() >= 3:
+				return Color(float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]) if parts.size() >= 4 else 1.0)
 	# Convert array elements
 	if typeof(value) == TYPE_ARRAY:
 		match expected_type:

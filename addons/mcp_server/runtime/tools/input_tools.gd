@@ -5,6 +5,7 @@ class_name InputTools
 
 var _held_keys: Dictionary = {}  # Key constant -> bool
 var _held_actions: Dictionary = {}  # Action name -> bool
+var _held_mouse_buttons: Dictionary = {}  # MouseButton -> bool
 
 
 ## Registers all input tools
@@ -63,6 +64,32 @@ static func register(registry: RefCounted) -> RefCounted:
 			"duration_ms": {"type": "integer", "default": 50}
 		}, []),
 		tools._execute_mouse_click
+	)
+
+	registry.register_tool(
+		_create_tool_def("runtime_input_mouse_hold", "Presses and holds a mouse button without auto-releasing", {
+			"button": {"type": "string", "enum": ["left", "right", "middle"], "default": "left", "description": "Mouse button to hold"},
+			"position": {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}, "description": "Position to press at. Uses current mouse position if omitted."}
+		}, []),
+		tools._execute_mouse_hold
+	)
+
+	registry.register_tool(
+		_create_tool_def("runtime_input_mouse_release", "Releases a currently held mouse button", {
+			"button": {"type": "string", "enum": ["left", "right", "middle"], "default": "left", "description": "Mouse button to release"}
+		}, []),
+		tools._execute_mouse_release
+	)
+
+	registry.register_tool(
+		_create_tool_def("runtime_input_mouse_drag", "Performs a complete drag operation (press, move, release) in one call", {
+			"start": {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}, "description": "Start position"},
+			"end": {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}, "description": "End position"},
+			"button": {"type": "string", "enum": ["left", "right", "middle"], "default": "left", "description": "Mouse button"},
+			"waypoints": {"type": "array", "items": {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}}}, "description": "Intermediate positions"},
+			"steps": {"type": "integer", "default": 10, "description": "Interpolation steps between positions"}
+		}, []),
+		tools._execute_mouse_drag
 	)
 
 	registry.register_tool(
@@ -148,6 +175,21 @@ func _parse_key(key_name: String) -> Key:
 		_:
 			# Unknown key - return KEY_UNKNOWN
 			return KEY_UNKNOWN
+
+
+func _parse_mouse_button(button_str: String) -> MouseButton:
+	match button_str.to_lower():
+		"left": return MOUSE_BUTTON_LEFT
+		"right": return MOUSE_BUTTON_RIGHT
+		"middle": return MOUSE_BUTTON_MIDDLE
+		_: return MOUSE_BUTTON_LEFT
+
+
+func _get_mouse_button_mask() -> int:
+	var mask: int = 0
+	for button_index: Variant in _held_mouse_buttons:
+		mask |= (1 << (int(button_index) - 1))
+	return mask
 
 
 # --- Tool Implementations ---
@@ -272,6 +314,11 @@ func _execute_mouse_move(args: Dictionary) -> Dictionary:
 		event.global_position = Vector2(x, y)
 		event.relative = Vector2(x, y) - current_pos
 
+	event.button_mask = _get_mouse_button_mask()
+
+	# Warp the actual tracked mouse position so get_mouse_position() updates
+	if not relative:
+		Input.warp_mouse(Vector2(x, y))
 	Input.parse_input_event(event)
 
 	return {
@@ -314,6 +361,7 @@ func _execute_mouse_click(args: Dictionary) -> Dictionary:
 	event.global_position = Vector2(x, y)
 	event.double_click = double_click
 
+	Input.warp_mouse(Vector2(x, y))
 	Input.parse_input_event(event)
 
 	# Hold for duration
@@ -332,6 +380,166 @@ func _execute_mouse_click(args: Dictionary) -> Dictionary:
 	return {
 		"content": [{"type": "text", "text": "%s click at (%.0f, %.0f)" % ["Double" if double_click else "", x, y]}],
 		"isError": false
+	}
+
+
+func _execute_mouse_hold(args: Dictionary) -> Dictionary:
+	var button_str: String = args.get("button", "left")
+	var position_data: Dictionary = args.get("position", {})
+
+	var button_index: MouseButton = _parse_mouse_button(button_str)
+
+	var x: float = position_data.get("x", 0.0)
+	var y: float = position_data.get("y", 0.0)
+	var has_position: bool = not position_data.is_empty()
+
+	if not has_position:
+		var viewport: Viewport = _get_viewport()
+		if viewport != null:
+			var current: Vector2 = viewport.get_mouse_position()
+			x = current.x
+			y = current.y
+
+	# Create press event
+	var event := InputEventMouseButton.new()
+	event.button_index = button_index
+	event.pressed = true
+	event.position = Vector2(x, y)
+	event.global_position = Vector2(x, y)
+
+	Input.warp_mouse(Vector2(x, y))
+	Input.parse_input_event(event)
+
+	# Track held button
+	_held_mouse_buttons[button_index] = true
+
+	return {
+		"content": [{"type": "text", "text": "Held %s mouse button at (%.0f, %.0f)" % [button_str, x, y]}],
+		"isError": false,
+		"structuredContent": {
+			"button": button_str,
+			"position": {"x": x, "y": y}
+		}
+	}
+
+
+func _execute_mouse_release(args: Dictionary) -> Dictionary:
+	var button_str: String = args.get("button", "left")
+
+	var button_index: MouseButton = _parse_mouse_button(button_str)
+
+	var was_held: bool = _held_mouse_buttons.get(button_index, false)
+
+	if was_held:
+		var viewport: Viewport = _get_viewport()
+		var x: float = 0.0
+		var y: float = 0.0
+		if viewport != null:
+			var current: Vector2 = viewport.get_mouse_position()
+			x = current.x
+			y = current.y
+
+		var event := InputEventMouseButton.new()
+		event.button_index = button_index
+		event.pressed = false
+		event.position = Vector2(x, y)
+		event.global_position = Vector2(x, y)
+
+		Input.parse_input_event(event)
+		_held_mouse_buttons.erase(button_index)
+
+		return {
+			"content": [{"type": "text", "text": "Released %s mouse button at (%.0f, %.0f)" % [button_str, x, y]}],
+			"isError": false,
+			"structuredContent": {
+				"button": button_str,
+				"was_held": true,
+				"position": {"x": x, "y": y}
+			}
+		}
+
+	return {
+		"content": [{"type": "text", "text": "%s mouse button was not held" % button_str.capitalize()}],
+		"isError": false,
+		"structuredContent": {
+			"button": button_str,
+			"was_held": false
+		}
+	}
+
+
+func _execute_mouse_drag(args: Dictionary) -> Dictionary:
+	var start_data: Dictionary = args.get("start", {})
+	var end_data: Dictionary = args.get("end", {})
+	var button_str: String = args.get("button", "left")
+	var waypoints: Array = args.get("waypoints", [])
+	var steps: int = args.get("steps", 10)
+
+	var button_index: MouseButton = _parse_mouse_button(button_str)
+
+	var start_x: float = start_data.get("x", 0.0)
+	var start_y: float = start_data.get("y", 0.0)
+	var end_x: float = end_data.get("x", 0.0)
+	var end_y: float = end_data.get("y", 0.0)
+
+	# Build position list: start + waypoints + end
+	var positions: Array[Vector2] = [Vector2(start_x, start_y)]
+	for wp: Dictionary in waypoints:
+		positions.append(Vector2(float(wp.get("x", 0.0)), float(wp.get("y", 0.0))))
+	positions.append(Vector2(end_x, end_y))
+
+	# 1. Send press event at start
+	var press_event := InputEventMouseButton.new()
+	press_event.button_index = button_index
+	press_event.pressed = true
+	press_event.position = positions[0]
+	press_event.global_position = positions[0]
+	Input.warp_mouse(positions[0])
+	Input.parse_input_event(press_event)
+	_held_mouse_buttons[button_index] = true
+
+	await _get_tree().process_frame
+
+	# 2. Move through each segment with interpolation
+	var total_segments: int = positions.size() - 1
+	var steps_per_segment: int = maxi(1, steps / total_segments)
+
+	for seg: int in range(total_segments):
+		var from: Vector2 = positions[seg]
+		var to: Vector2 = positions[seg + 1]
+
+		for step: int in range(1, steps_per_segment + 1):
+			var t: float = float(step) / float(steps_per_segment)
+			var pos: Vector2 = from.lerp(to, t)
+
+			var motion_event := InputEventMouseMotion.new()
+			motion_event.position = pos
+			motion_event.global_position = pos
+			motion_event.relative = pos - (from if step == 1 else from.lerp(to, float(step - 1) / float(steps_per_segment)))
+			motion_event.button_mask = _get_mouse_button_mask()
+			Input.warp_mouse(pos)
+			Input.parse_input_event(motion_event)
+
+			await _get_tree().process_frame
+
+	# 3. Send release event at end
+	var release_event := InputEventMouseButton.new()
+	release_event.button_index = button_index
+	release_event.pressed = false
+	release_event.position = positions[positions.size() - 1]
+	release_event.global_position = positions[positions.size() - 1]
+	Input.parse_input_event(release_event)
+	_held_mouse_buttons.erase(button_index)
+
+	return {
+		"content": [{"type": "text", "text": "Dragged %s from (%.0f, %.0f) to (%.0f, %.0f)" % [button_str, start_x, start_y, end_x, end_y]}],
+		"isError": false,
+		"structuredContent": {
+			"start": {"x": start_x, "y": start_y},
+			"end": {"x": end_x, "y": end_y},
+			"button": button_str,
+			"waypoints": waypoints.size()
+		}
 	}
 
 

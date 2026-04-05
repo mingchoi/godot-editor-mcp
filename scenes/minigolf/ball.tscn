@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://y164ccjivffa"]
+
+[node name="Ball" type="RigidBody3D" unique_id=734763592]
+mass = 0.1
+linear_damp = 0.5
+angular_damp = 0.5
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1316194320]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=499062055]

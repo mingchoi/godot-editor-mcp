@@ -41,6 +41,7 @@ func _register_tools() -> void:
 	const InputToolsClass = preload("res://addons/mcp_server/runtime/tools/input_tools.gd")
 	const CaptureToolsClass = preload("res://addons/mcp_server/runtime/tools/capture_tools.gd")
 	const GameControlToolsClass = preload("res://addons/mcp_server/runtime/tools/game_control_tools.gd")
+	const CursorOverlayToolsClass = preload("res://addons/mcp_server/runtime/tools/cursor_overlay_tools.gd")
 
 	# Register tools using static register functions
 	_tool_objects.append(RuntimeQueryToolsClass.register(registry))
@@ -48,5 +49,6 @@ func _register_tools() -> void:
 	_tool_objects.append(InputToolsClass.register(registry))
 	_tool_objects.append(CaptureToolsClass.register(registry))
 	_tool_objects.append(GameControlToolsClass.register(registry))
+	_tool_objects.append(CursorOverlayToolsClass.register(registry))
 
 	print("[Runtime MCP Server] Registered %d tools" % registry.size())
