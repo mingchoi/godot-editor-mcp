@@ -1,0 +1,283 @@
+[gd_scene format=3 uid="uid://wgfwoyqewj24"]
+
+[ext_resource type="Script" uid="uid://b00i1yurw5cl7" path="res://scenes/arpg_basic/monster.gd" id="1_twims"]
+[ext_resource type="Script" uid="uid://7rxcdswvumja" path="res://scenes/arpg_basic/player.gd" id="2_3sklf"]
+[ext_resource type="Script" uid="uid://dk4lke0mcug22" path="res://scenes/arpg_basic/camera_follow.gd" id="3_57sc8"]
+[ext_resource type="Script" uid="uid://qlnp6fny72al" path="res://scenes/arpg_basic/game_manager.gd" id="4_nhj3y"]
+[ext_resource type="PackedScene" uid="uid://pfwb3xy6pb6l" path="res://scenes/arpg_basic/tree.tscn" id="5_t8l22"]
+
+[sub_resource type="Environment" id="Environment_ew6sq"]
+resource_local_to_scene = true
+background_mode = 3
+background_color = Color(0.5294118, 0.80784315, 0.92156863, 1)
+ambient_light_source = 1
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 0.8
+tonemap_mode = 1
+
+[sub_resource type="BoxMesh" id="BoxMesh_7nbxw"]
+resource_local_to_scene = true
+size = Vector3(40, 1, 40)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_twims"]
+resource_local_to_scene = true
+albedo_color = Color(0.2901961, 0.4862745, 0.24705882, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_eo58u"]
+resource_local_to_scene = true
+size = Vector3(40, 1, 40)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_xuv08"]
+resource_local_to_scene = true
+height = 1.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3sklf"]
+resource_local_to_scene = true
+albedo_color = Color(0.90588236, 0.29803923, 0.23529412, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_d2c6o"]
+resource_local_to_scene = true
+radius = 0.4
+height = 1.5
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_a7bgb"]
+resource_local_to_scene = true
+radius = 2.0
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_oc860"]
+resource_local_to_scene = true
+height = 1.7
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_2lnql"]
+resource_local_to_scene = true
+radius = 0.4
+height = 1.5
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_yx2vt"]
+resource_local_to_scene = true
+radius = 2.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_twims"]
+resource_local_to_scene = true
+radius = 2.0
+height = 2.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8dqa7"]
+resource_local_to_scene = true
+transparency = 1
+albedo_color = Color(1, 0.26666668, 0.26666668, 0.6)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_f74ey"]
+resource_local_to_scene = true
+radius = 0.4
+height = 1.5
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_axtew"]
+resource_local_to_scene = true
+height = 1.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_57sc8"]
+resource_local_to_scene = true
+albedo_color = Color(0.20392157, 0.59607846, 0.85882354, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_838mu"]
+resource_local_to_scene = true
+radius = 0.4
+height = 1.5
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_twims"]
+resource_local_to_scene = true
+size = Vector3(2, 2, 1.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3sklf"]
+resource_local_to_scene = true
+size = Vector3(1.2, 2, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wp423"]
+resource_local_to_scene = true
+transparency = 1
+albedo_color = Color(1, 0, 0, 0.6)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_u8tmu"]
+resource_local_to_scene = true
+radius = 5.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_twims"]
+resource_local_to_scene = true
+size = Vector3(10, 0.15, 10)
+
+[node name="ArpgBasic" type="Node3D" unique_id=2024295821]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=759639208]
+environment = SubResource("Environment_ew6sq")
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=2146481177]
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=629622253]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("BoxMesh_7nbxw")
+surface_material_override/0 = SubResource("StandardMaterial3D_twims")
+
+[node name="GroundCollision" type="CollisionShape3D" parent="Ground" unique_id=886017240]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+shape = SubResource("BoxShape3D_eo58u")
+
+[node name="MainLight" type="DirectionalLight3D" parent="." unique_id=1091175828]
+transform = Transform3D(0.921061, -0.21988213, 0.32140082, 0, 0.8253356, 0.5646425, -0.38941833, -0.52007014, 0.7601844, 10, 15, 10)
+light_energy = 4.0
+shadow_enabled = true
+
+[node name="Monster" type="CharacterBody3D" parent="." unique_id=1864972679]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, 5)
+script = ExtResource("1_twims")
+
+[node name="MonsterMesh" type="MeshInstance3D" parent="Monster" unique_id=1123721407]
+mesh = SubResource("CapsuleMesh_xuv08")
+surface_material_override/0 = SubResource("StandardMaterial3D_3sklf")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Monster" unique_id=333259154]
+shape = SubResource("CapsuleShape3D_d2c6o")
+
+[node name="AttackArea" type="Area3D" parent="Monster" unique_id=721145747]
+monitoring = false
+
+[node name="AttackCollision" type="CollisionShape3D" parent="Monster/AttackArea" unique_id=1439113727]
+shape = SubResource("SphereShape3D_a7bgb")
+
+[node name="@MeshInstance3D@20520" type="MeshInstance3D" parent="Monster" unique_id=1324882773]
+mesh = SubResource("CapsuleMesh_oc860")
+
+[node name="@CollisionShape3D@20521" type="CollisionShape3D" parent="Monster" unique_id=2106439436]
+shape = SubResource("CapsuleShape3D_2lnql")
+
+[node name="@Area3D@20522" type="Area3D" parent="Monster" unique_id=1875834290]
+monitoring = false
+
+[node name="AttackCollision" type="CollisionShape3D" parent="Monster/@Area3D@20522" unique_id=1871130845]
+shape = SubResource("SphereShape3D_yx2vt")
+
+[node name="AttackVisual" type="MeshInstance3D" parent="Monster/@Area3D@20522" unique_id=408844142]
+visible = false
+mesh = SubResource("SphereMesh_twims")
+surface_material_override/0 = SubResource("StandardMaterial3D_8dqa7")
+
+[node name="BodyShape" type="CollisionShape3D" parent="Monster" unique_id=2042923663]
+shape = SubResource("CapsuleShape3D_f74ey")
+
+[node name="Player" type="CharacterBody3D" parent="." unique_id=361121581]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+script = ExtResource("2_3sklf")
+
+[node name="PlayerMesh" type="MeshInstance3D" parent="Player" unique_id=1580748118]
+mesh = SubResource("CapsuleMesh_axtew")
+surface_material_override/0 = SubResource("StandardMaterial3D_57sc8")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player" unique_id=1855191975]
+shape = SubResource("CapsuleShape3D_838mu")
+
+[node name="AttackArea" type="Area3D" parent="Player" unique_id=1873686984]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2)
+monitoring = false
+
+[node name="AttackCollision" type="CollisionShape3D" parent="Player/AttackArea" unique_id=87343623]
+shape = SubResource("BoxShape3D_twims")
+
+[node name="AttackVisual" type="MeshInstance3D" parent="Player/AttackArea" unique_id=894873017]
+visible = false
+mesh = SubResource("BoxMesh_3sklf")
+surface_material_override/0 = SubResource("StandardMaterial3D_wp423")
+
+[node name="AOEArea" type="Area3D" parent="Player" unique_id=676429288]
+monitoring = false
+
+[node name="AOECollision" type="CollisionShape3D" parent="Player/AOEArea" unique_id=435839400]
+shape = SubResource("SphereShape3D_u8tmu")
+
+[node name="AOEVisual" type="MeshInstance3D" parent="Player" unique_id=1301635505]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+visible = false
+mesh = SubResource("BoxMesh_twims")
+
+[node name="@CharacterBody3D@20519" type="CharacterBody3D" parent="." unique_id=168887617]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, 8)
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1691037436]
+layer = 10
+
+[node name="HealthBarContainer" type="VBoxContainer" parent="UI" unique_id=1717015890]
+custom_minimum_size = Vector2(220, 100)
+anchors_preset = -1
+anchor_left = 0.02
+anchor_top = 0.02
+anchor_right = 0.28
+anchor_bottom = 0.22
+
+[node name="HealthLabel" type="Label" parent="UI/HealthBarContainer" unique_id=2103262115]
+layout_mode = 2
+text = "HP"
+
+[node name="HealthBar" type="ProgressBar" parent="UI/HealthBarContainer" unique_id=1445970481]
+custom_minimum_size = Vector2(200, 25)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="ManaLabel" type="Label" parent="UI/HealthBarContainer" unique_id=1256801283]
+layout_mode = 2
+text = "MP"
+
+[node name="ManaBar" type="ProgressBar" parent="UI/HealthBarContainer" unique_id=1545620727]
+custom_minimum_size = Vector2(200, 25)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="CombatLog" type="RichTextLabel" parent="UI" unique_id=710321179]
+anchors_preset = -1
+anchor_left = 0.02
+anchor_top = 0.7
+anchor_right = 0.42
+anchor_bottom = 0.98
+bbcode_enabled = true
+scroll_following = true
+
+[node name="Instructions" type="Label" parent="UI" unique_id=896977274]
+anchors_preset = -1
+anchor_left = 0.25
+anchor_top = 0.95
+anchor_right = 0.75
+anchor_bottom = 0.99
+text = "WASD: Move | J: Attack | K: AOE | L: Heal | R: Reset | T: Toggle Monster Atk"
+horizontal_alignment = 1
+
+[node name="GameManager" type="Node" parent="." unique_id=806693322]
+script = ExtResource("4_nhj3y")
+
+[node name="Tree1" parent="." unique_id=1637809029 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, -12)
+
+[node name="Tree2" parent="." unique_id=694697430 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, 5)
+
+[node name="Tree3" parent="." unique_id=1981143310 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -8)
+
+[node name="Tree4" parent="." unique_id=751076817 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, 14)
+
+[node name="Tree5" parent="." unique_id=770939097 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, 12)
+
+[node name="Tree6" parent="." unique_id=421009482 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -5)
+
+[node name="Tree7" parent="." unique_id=450913852 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, -15)
+
+[node name="Tree8" parent="." unique_id=633158532 instance=ExtResource("5_t8l22")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0, -2)
+
+[node name="CameraRoot" type="Node3D" parent="." unique_id=1807312221]
+
+[node name="Camera3D" type="Camera3D" parent="CameraRoot" unique_id=1356688071]
+script = ExtResource("3_57sc8")
